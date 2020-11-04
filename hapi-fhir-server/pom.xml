@@ -9,14 +9,16 @@
 		<relativePath>../hapi-deployable-pom/pom.xml</relativePath>
 	</parent>
 
+    <groupId>nl.hinq.fhir</groupId>
 	<artifactId>hapi-fhir-server</artifactId>
+    <version>5.1.0</version>
 	<packaging>bundle</packaging>
 
 	<name>HAPI FHIR - Server Framework</name>
 
 	<dependencies>
 		<dependency>
-			<groupId>ca.uhn.hapi.fhir</groupId>
+			<groupId>nl.hinq.fhir</groupId>
 			<artifactId>hapi-fhir-base</artifactId>
 			<version>${project.version}</version>
 		</dependency>
@@ -24,6 +26,12 @@
 			<groupId>ca.uhn.hapi.fhir</groupId>
 			<artifactId>org.hl7.fhir.utilities</artifactId>
 			<version>${fhir_core_version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>ca.uhn.hapi.fhir</groupId>
+                    <artifactId>hapi-fhir-base</artifactId>
+                </exclusion>
+            </exclusions>
 		</dependency>
 
 		<!-- Server -->
@@ -110,6 +118,17 @@
                         <_removeheaders>Built-By, Include-Resource, Private-Package, Require-Capability</_removeheaders>
                     </instructions>
                 </configuration>
+            </plugin>
+            <plugin>
+                <artifactId>maven-source-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>attach-sources</id>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
 		</plugins>
 		<resources>

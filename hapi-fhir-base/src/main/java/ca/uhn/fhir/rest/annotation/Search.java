@@ -91,4 +91,9 @@ public @interface Search {
 	 * </p>
 	 */
 	boolean allowUnknownParams() default false;
+
+    /**
+     * If specified, this is the ID of the tenant that the search is for.
+     */
+    String tenantId() default "";
 }

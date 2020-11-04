@@ -1011,8 +1011,12 @@ public class RestfulServer extends HttpServlet implements IRestfulServer<Servlet
 			postProcessedParams.add(HttpServletRequest.class, theRequest);
 			postProcessedParams.add(HttpServletResponse.class, theResponse);
 			if (!myInterceptorService.callHooks(Pointcut.SERVER_INCOMING_REQUEST_POST_PROCESSED, postProcessedParams)) {
-					return;
-				}
+                return;
+            }
+
+            // Redetermine the resource method to allow the interceptors to influence it
+            resourceMethod = determineResourceMethod(requestDetails, requestPath);
+            ourLog.trace("Determined resource method {} for incoming request", resourceMethod.getMethod().toString());
 
 			/*
 			 * Actually invoke the server method. This call is to a HAPI method binding, which

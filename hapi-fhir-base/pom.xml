@@ -9,7 +9,9 @@
 		<relativePath>../hapi-deployable-pom/pom.xml</relativePath>
 	</parent>
 
+    <groupId>nl.hinq.fhir</groupId>
 	<artifactId>hapi-fhir-base</artifactId>
+    <version>5.1.0</version>
 	<packaging>bundle</packaging>
 
 	<url>http://jamesagnew.github.io/hapi-fhir/</url>
@@ -193,6 +195,17 @@
 					</execution>
 				</executions>
 			</plugin>
+            <plugin>
+                <artifactId>maven-source-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>attach-sources</id>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
 		</plugins>
 		<resources>
 			<resource>
