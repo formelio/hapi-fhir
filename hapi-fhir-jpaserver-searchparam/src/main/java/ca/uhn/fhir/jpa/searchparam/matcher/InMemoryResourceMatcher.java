@@ -1,5 +1,14 @@
 package ca.uhn.fhir.jpa.searchparam.matcher;
 
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import org.hl7.fhir.dstu3.model.Location;
+import org.hl7.fhir.instance.model.api.IAnyResource;
+import org.hl7.fhir.instance.model.api.IBaseResource;
+import org.hl7.fhir.instance.model.api.IIdType;
+import org.springframework.beans.factory.annotation.Autowired;
+
 /*-
  * #%L
  * HAPI FHIR Search Parameters
@@ -39,15 +48,6 @@ import ca.uhn.fhir.rest.param.StringParam;
 import ca.uhn.fhir.rest.server.exceptions.InvalidRequestException;
 import ca.uhn.fhir.util.MetaUtil;
 import ca.uhn.fhir.util.UrlUtil;
-import org.hl7.fhir.dstu3.model.Location;
-import org.hl7.fhir.instance.model.api.IAnyResource;
-import org.hl7.fhir.instance.model.api.IBaseResource;
-import org.hl7.fhir.instance.model.api.IIdType;
-import org.springframework.beans.factory.annotation.Autowired;
-
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 
 public class InMemoryResourceMatcher {
 
@@ -199,7 +199,7 @@ public class InMemoryResourceMatcher {
 					if (theSearchParams == null) {
 						return InMemoryMatchResult.successfulMatch();
 					} else {
-						return InMemoryMatchResult.fromBoolean(theAndOrParams.stream().anyMatch(nextAnd -> matchParams(theModelConfig, theResourceName, theParamName, theParamDef, nextAnd, theSearchParams, myModelConfig.getUseOrdinalDatesForDayPrecisionSearches())));
+						return InMemoryMatchResult.fromBoolean(theAndOrParams.stream().allMatch(nextAnd -> matchParams(theModelConfig, theResourceName, theParamName, theParamDef, nextAnd, theSearchParams, myModelConfig.getUseOrdinalDatesForDayPrecisionSearches())));
 					}
 				case COMPOSITE:
 				case HAS:
