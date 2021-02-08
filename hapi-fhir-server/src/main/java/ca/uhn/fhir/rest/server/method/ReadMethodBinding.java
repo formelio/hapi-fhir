@@ -55,11 +55,13 @@ import java.util.Set;
 
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
+
 public class ReadMethodBinding extends BaseResourceReturningMethodBinding {
 	private static final org.slf4j.Logger ourLog = org.slf4j.LoggerFactory.getLogger(ReadMethodBinding.class);
 
 	private Integer myIdIndex;
 	private boolean mySupportsVersion;
+	private String myTenantId;
 	private Class<? extends IIdType> myIdParameterType;
 
 	@SuppressWarnings("unchecked")
@@ -72,8 +74,10 @@ public class ReadMethodBinding extends BaseResourceReturningMethodBinding {
 
 		Class<?>[] parameterTypes = theMethod.getParameterTypes();
 
-		mySupportsVersion = theMethod.getAnnotation(Read.class).version();
+		Read read = theMethod.getAnnotation(Read.class);
+		mySupportsVersion = read.version();
 		myIdIndex = idIndex;
+		myTenantId = StringUtils.defaultIfBlank(read.tenantId(), null);
 
 		if (myIdIndex == null) {
 			throw new ConfigurationException("@" + Read.class.getSimpleName() + " method " + theMethod.getName() + " on type \"" + theMethod.getDeclaringClass().getName() + "\" does not have a parameter annotated with @" + IdParam.class.getSimpleName());
@@ -130,6 +134,10 @@ public class ReadMethodBinding extends BaseResourceReturningMethodBinding {
 			if (theRequest.getId().hasVersionIdPart()) {
 				return MethodMatchEnum.NONE;
 			}
+		}
+		if (!StringUtils.equals(myTenantId, theRequest.getTenantId())) {
+			ourLog.trace("Method {} doesn't match because it is for tenant {} but request is for tenant {}", getMethod(), myTenantId, theRequest.getTenantId());
+			return MethodMatchEnum.NONE;
 		}
 		if (isNotBlank(theRequest.getCompartmentName())) {
 			return MethodMatchEnum.NONE;
