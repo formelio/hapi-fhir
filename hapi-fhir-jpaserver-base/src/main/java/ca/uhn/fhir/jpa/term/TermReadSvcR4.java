@@ -8,6 +8,7 @@ import ca.uhn.fhir.context.support.ValueSetExpansionOptions;
 import ca.uhn.fhir.jpa.model.entity.ResourceTable;
 import ca.uhn.fhir.jpa.term.api.ITermReadSvcR4;
 import ca.uhn.fhir.jpa.term.ex.ExpansionTooCostlyException;
+import org.hl7.fhir.instance.model.api.IBaseCoding;
 import org.hl7.fhir.instance.model.api.IBaseDatatype;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.r4.model.CodeSystem;
@@ -23,7 +24,7 @@ import javax.transaction.Transactional;
  * #%L
  * HAPI FHIR JPA Server
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -104,6 +105,11 @@ public class TermReadSvcR4 extends BaseTermReadSvcImpl implements ITermReadSvcR4
 
 	@Override
 	protected Coding toCanonicalCoding(IBaseDatatype theCoding) {
+		return (Coding) theCoding;
+	}
+
+	@Override
+	protected Coding toCanonicalCoding(IBaseCoding theCoding) {
 		return (Coding) theCoding;
 	}
 

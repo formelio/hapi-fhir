@@ -80,6 +80,7 @@ public class FhirResourceDaoR4TerminologyTest extends BaseJpaR4Test {
 	private CodeSystem createExternalCs() {
 		CodeSystem codeSystem = new CodeSystem();
 		codeSystem.setUrl(URL_MY_CODE_SYSTEM);
+		codeSystem.setVersion("SYSTEM VERSION");
 		codeSystem.setContent(CodeSystemContentMode.NOTPRESENT);
 		IIdType id = myCodeSystemDao.create(codeSystem, mySrd).getId().toUnqualified();
 
@@ -129,6 +130,7 @@ public class FhirResourceDaoR4TerminologyTest extends BaseJpaR4Test {
 	private CodeSystem createExternalCsDogs() {
 		CodeSystem codeSystem = new CodeSystem();
 		codeSystem.setUrl(URL_MY_CODE_SYSTEM);
+		codeSystem.setVersion("SYSTEM VERSION");
 		codeSystem.setContent(CodeSystemContentMode.NOTPRESENT);
 		IIdType id = myCodeSystemDao.create(codeSystem, mySrd).getId().toUnqualified();
 
@@ -159,6 +161,7 @@ public class FhirResourceDaoR4TerminologyTest extends BaseJpaR4Test {
 	private void createExternalCsLarge() {
 		CodeSystem codeSystem = new CodeSystem();
 		codeSystem.setUrl(URL_MY_CODE_SYSTEM);
+		codeSystem.setVersion("SYSTEM VERSION");
 		codeSystem.setContent(CodeSystemContentMode.NOTPRESENT);
 		IIdType id = myCodeSystemDao.create(codeSystem, mySrd).getId().toUnqualified();
 
@@ -232,6 +235,7 @@ public class FhirResourceDaoR4TerminologyTest extends BaseJpaR4Test {
 
 	@Test
 	public void testCodeSystemCreateDuplicateFails() {
+		// No version.
 		CodeSystem codeSystem = new CodeSystem();
 		codeSystem.setUrl(URL_MY_CODE_SYSTEM);
 		codeSystem.setContent(CodeSystemContentMode.COMPLETE);
@@ -246,6 +250,25 @@ public class FhirResourceDaoR4TerminologyTest extends BaseJpaR4Test {
 		} catch (UnprocessableEntityException e) {
 			assertEquals("Can not create multiple CodeSystem resources with CodeSystem.url \"http://example.com/my_code_system\", already have one with resource ID: CodeSystem/" + id.getIdPart(), e.getMessage());
 		}
+
+		// With version.
+		codeSystem = new CodeSystem();
+		codeSystem.setUrl(URL_MY_CODE_SYSTEM);
+		codeSystem.setVersion("1");
+		codeSystem.setContent(CodeSystemContentMode.COMPLETE);
+		id = myCodeSystemDao.create(codeSystem, mySrd).getId().toUnqualified();
+
+		codeSystem = new CodeSystem();
+		codeSystem.setUrl(URL_MY_CODE_SYSTEM);
+		codeSystem.setVersion("1");
+		codeSystem.setContent(CodeSystemContentMode.COMPLETE);
+		try {
+			myCodeSystemDao.create(codeSystem, mySrd);
+			fail();
+		} catch (UnprocessableEntityException e) {
+			assertEquals("Can not create multiple CodeSystem resources with CodeSystem.url \"http://example.com/my_code_system\" and CodeSystem.version \"1\", already have one with resource ID: CodeSystem/" + id.getIdPart(), e.getMessage());
+		}
+
 	}
 
 	@Test
@@ -307,6 +330,33 @@ public class FhirResourceDaoR4TerminologyTest extends BaseJpaR4Test {
 			assertEquals("Invalid filter, must have fields populated: property op value", e.getMessage());
 		}
 	}
+	@Test
+	public void testExpandWithIncludeConceptHaveCodeAndDisplay() {
+		CodeSystem codeSystem = createExternalCsDogs();
+
+		ValueSet valueSet = new ValueSet();
+		valueSet.setUrl(URL_MY_VALUE_SET);
+		valueSet.getCompose()
+			.addInclude()
+			.setSystem(codeSystem.getUrl())
+			.addConcept(new ConceptReferenceComponent().setCode("hello").setDisplay("Display-VS"))
+			.addConcept(new ConceptReferenceComponent().setCode("goodbye").setDisplay("Goodbye-VS"));
+
+		myValueSetDao.create(valueSet, mySrd);
+
+		ValueSet result = myValueSetDao.expand(valueSet, "");
+		logAndValidateValueSet(result);
+
+		assertEquals(2, result.getExpansion().getTotal());
+		ArrayList<String> codes = toCodesContains(result.getExpansion().getContains());
+		assertThat(codes, containsInAnyOrder("hello", "goodbye"));
+		for (ValueSetExpansionContainsComponent vsConcept : result.getExpansion().getContains()){
+			assertTrue(vsConcept.getDisplay().contains("VS"));
+		}
+
+
+	}
+
 
 	@Test
 	public void testExpandWithCodesAndDisplayFilterBlank() {
@@ -473,6 +523,7 @@ public class FhirResourceDaoR4TerminologyTest extends BaseJpaR4Test {
 	public void testExpandWithIncludeContainingDashesInInclude() {
 		CodeSystem codeSystem = new CodeSystem();
 		codeSystem.setUrl(URL_MY_CODE_SYSTEM);
+		codeSystem.setVersion("SYSTEM VERSION");
 		codeSystem.setContent(CodeSystemContentMode.NOTPRESENT);
 		IIdType id = myCodeSystemDao.create(codeSystem, mySrd).getId().toUnqualified();
 
@@ -815,6 +866,7 @@ public class FhirResourceDaoR4TerminologyTest extends BaseJpaR4Test {
 	public void testLookupSnomed() {
 		CodeSystem codeSystem = new CodeSystem();
 		codeSystem.setUrl("http://snomed.info/sct");
+		codeSystem.setVersion("SYSTEM VERSION");
 		codeSystem.setContent(CodeSystemContentMode.NOTPRESENT);
 		IIdType id = myCodeSystemDao.create(codeSystem, mySrd).getId().toUnqualified();
 
@@ -990,6 +1042,7 @@ public class FhirResourceDaoR4TerminologyTest extends BaseJpaR4Test {
 		myAllergyIntoleranceDao.create(ai3, mySrd).getId().toUnqualifiedVersionless().getValue();
 
 		SearchParameterMap params;
+
 		params = new SearchParameterMap();
 		params.add(AllergyIntolerance.SP_CLINICAL_STATUS, new TokenParam(null, "active"));
 		assertThat(toUnqualifiedVersionlessIdValues(myAllergyIntoleranceDao.search(params)), containsInAnyOrder(id1));

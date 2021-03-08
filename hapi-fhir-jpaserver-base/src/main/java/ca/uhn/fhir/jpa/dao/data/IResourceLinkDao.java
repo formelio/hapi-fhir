@@ -4,7 +4,7 @@ package ca.uhn.fhir.jpa.dao.data;
  * #%L
  * HAPI FHIR JPA Server
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,5 +35,8 @@ public interface IResourceLinkDao extends JpaRepository<ResourceLink, Long> {
 	void deleteByResourceId(@Param("resId") Long theResourcePid);
 
 	@Query("SELECT t FROM ResourceLink t WHERE t.mySourceResourcePid = :resId")
-	List<ResourceLink> findAllForResourceId(@Param("resId") Long thePatientId);
+	List<ResourceLink> findAllForSourceResourceId(@Param("resId") Long thePatientId);
+
+	@Query("SELECT t FROM ResourceLink t WHERE t.myTargetResourcePid in :resIds")
+	List<ResourceLink> findWithTargetPidIn(@Param("resIds") List<Long> thePids);
 }

@@ -4,7 +4,7 @@ package ca.uhn.fhir.jpa.term.loinc;
  * #%L
  * HAPI FHIR JPA Server
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,6 +33,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
+import static ca.uhn.fhir.jpa.term.loinc.LoincUploadPropertiesEnum.LOINC_CODESYSTEM_VERSION;
+import static ca.uhn.fhir.jpa.term.loinc.LoincUploadPropertiesEnum.LOINC_CONCEPTMAP_VERSION;
 import static org.apache.commons.lang3.StringUtils.defaultString;
 import static org.apache.commons.lang3.StringUtils.trim;
 
@@ -40,11 +42,11 @@ public class LoincPartRelatedCodeMappingHandler extends BaseLoincHandler impleme
 
 	public static final String LOINC_SCT_PART_MAP_ID = "loinc-parts-to-snomed-ct";
 	public static final String LOINC_SCT_PART_MAP_URI = "http://loinc.org/cm/loinc-parts-to-snomed-ct";
-	public static final String LOINC_TERM_TO_RPID_PART_MAP_ID = "loinc-to-rpids";
-	public static final String LOINC_TERM_TO_RPID_PART_MAP_URI = "http://loinc.org/cm/loinc-to-rpids";
+	public static final String LOINC_TERM_TO_RPID_PART_MAP_ID = "loinc-to-radlex";
+	public static final String LOINC_TERM_TO_RPID_PART_MAP_URI = "http://loinc.org/cm/loinc-to-radlex";
 	public static final String LOINC_TERM_TO_RPID_PART_MAP_NAME = "LOINC Terms to RadLex RPIDs";
-	public static final String LOINC_PART_TO_RID_PART_MAP_ID = "loinc-part-to-rids";
-	public static final String LOINC_PART_TO_RID_PART_MAP_URI = "http://loinc.org/cm/loinc-part-to-rids";
+	public static final String LOINC_PART_TO_RID_PART_MAP_ID = "loinc-parts-to-radlex";
+	public static final String LOINC_PART_TO_RID_PART_MAP_URI = "http://loinc.org/cm/loinc-parts-to-radlex";
 	public static final String LOINC_PART_TO_RID_PART_MAP_NAME = "LOINC Parts to RadLex RIDs";
 	private static final String LOINC_SCT_PART_MAP_NAME = "LOINC Part Map to SNOMED CT";
 	private static final String LOINC_RXNORM_PART_MAP_ID = "loinc-parts-to-rxnorm";
@@ -75,6 +77,17 @@ public class LoincPartRelatedCodeMappingHandler extends BaseLoincHandler impleme
 		String extCodeSystemVersion = trim(theRecord.get("ExtCodeSystemVersion"));
 		String extCodeSystemCopyrightNotice = trim(theRecord.get("ExtCodeSystemCopyrightNotice"));
 
+		// CodeSystem version from properties file
+		String codeSystemVersionId = myUploadProperties.getProperty(LOINC_CODESYSTEM_VERSION.getCode());
+
+		// ConceptMap version from properties files
+		String loincPartMapVersion;
+		if (codeSystemVersionId != null) {
+			loincPartMapVersion = myUploadProperties.getProperty(LOINC_CONCEPTMAP_VERSION.getCode()) + "-" + codeSystemVersionId;
+		} else {
+			loincPartMapVersion = myUploadProperties.getProperty(LOINC_CONCEPTMAP_VERSION.getCode());
+		}
+		
 		Enumerations.ConceptMapEquivalence equivalence;
 		switch (trim(defaultString(mapType))) {
 			case "":
@@ -125,13 +138,21 @@ public class LoincPartRelatedCodeMappingHandler extends BaseLoincHandler impleme
 				loincPartMapName = "Unknown Mapping";
 				break;
 		}
+		String conceptMapId;
+		if (codeSystemVersionId != null) {
+			conceptMapId = loincPartMapId + "-" + codeSystemVersionId;
+		} else {
+			conceptMapId = loincPartMapId;
+		}
 
 		addConceptMapEntry(
 			new ConceptMapping()
-				.setConceptMapId(loincPartMapId)
+				.setConceptMapId(conceptMapId)
 				.setConceptMapUri(loincPartMapUri)
+				.setConceptMapVersion(loincPartMapVersion)
 				.setConceptMapName(loincPartMapName)
 				.setSourceCodeSystem(ITermLoaderSvc.LOINC_URI)
+				.setSourceCodeSystemVersion(codeSystemVersionId)
 				.setSourceCode(partNumber)
 				.setSourceDisplay(partName)
 				.setTargetCodeSystem(extCodeSystem)

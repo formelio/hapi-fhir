@@ -37,6 +37,7 @@ import ca.uhn.fhir.jpa.model.entity.BaseHasResource;
 import ca.uhn.fhir.jpa.model.entity.BaseTag;
 import ca.uhn.fhir.jpa.model.entity.ForcedId;
 import ca.uhn.fhir.jpa.model.entity.IBaseResourceEntity;
+import ca.uhn.fhir.jpa.model.entity.PartitionablePartitionId;
 import ca.uhn.fhir.jpa.model.entity.ResourceEncodingEnum;
 import ca.uhn.fhir.jpa.model.entity.ResourceHistoryProvenanceEntity;
 import ca.uhn.fhir.jpa.model.entity.ResourceHistoryTable;
@@ -79,7 +80,6 @@ import ca.uhn.fhir.rest.api.server.RequestDetails;
 import ca.uhn.fhir.rest.api.server.storage.TransactionDetails;
 import ca.uhn.fhir.rest.server.exceptions.InternalErrorException;
 import ca.uhn.fhir.rest.server.exceptions.ResourceNotFoundException;
-import ca.uhn.fhir.rest.server.exceptions.ResourceVersionConflictException;
 import ca.uhn.fhir.rest.server.exceptions.UnprocessableEntityException;
 import ca.uhn.fhir.rest.server.interceptor.IServerInterceptor.ActionRequestDetails;
 import ca.uhn.fhir.rest.server.servlet.ServletRequestDetails;
@@ -114,10 +114,6 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.support.TransactionCallback;
-import org.springframework.transaction.support.TransactionSynchronizationAdapter;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
-import org.springframework.transaction.support.TransactionTemplate;
 
 import javax.annotation.PostConstruct;
 import javax.persistence.EntityManager;
@@ -155,7 +151,7 @@ import static org.apache.commons.lang3.StringUtils.trim;
  * #%L
  * HAPI FHIR JPA Server
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -177,7 +173,7 @@ public abstract class BaseHapiFhirDao<T extends IBaseResource> extends BaseStora
 
 	public static final long INDEX_STATUS_INDEXED = 1L;
 	public static final long INDEX_STATUS_INDEXING_FAILED = 2L;
-	public static final String NS_JPA_PROFILE = "https://github.com/jamesagnew/hapi-fhir/ns/jpa/profile";
+	public static final String NS_JPA_PROFILE = "https://github.com/hapifhir/hapi-fhir/ns/jpa/profile";
 	public static final String OO_SEVERITY_ERROR = "error";
 	public static final String OO_SEVERITY_INFO = "information";
 	public static final String OO_SEVERITY_WARN = "warning";
@@ -636,7 +632,7 @@ public abstract class BaseHapiFhirDao<T extends IBaseResource> extends BaseStora
 		ResourceMetadataKeyEnum.VERSION.put(res, Long.toString(theEntity.getVersion()));
 		ResourceMetadataKeyEnum.PUBLISHED.put(res, theEntity.getPublished());
 		ResourceMetadataKeyEnum.UPDATED.put(res, theEntity.getUpdated());
-		IDao.RESOURCE_PID.put(res, theEntity.getId());
+		IDao.RESOURCE_PID.put(res, theEntity.getResourceId());
 
 		Collection<? extends BaseTag> tags = theTagList;
 		if (theEntity.isHasTags()) {
@@ -708,7 +704,7 @@ public abstract class BaseHapiFhirDao<T extends IBaseResource> extends BaseStora
 		res.setId(res.getIdElement().withVersion(theVersion.toString()));
 
 		res.getMeta().setLastUpdated(theEntity.getUpdatedDate());
-		IDao.RESOURCE_PID.put(res, theEntity.getId());
+		IDao.RESOURCE_PID.put(res, theEntity.getResourceId());
 
 		Collection<? extends BaseTag> tags = theTagList;
 
@@ -967,7 +963,7 @@ public abstract class BaseHapiFhirDao<T extends IBaseResource> extends BaseStora
 
 		// 7. Add partition information
 		if (myPartitionSettings.isPartitioningEnabled()) {
-			RequestPartitionId partitionId = theEntity.getPartitionId();
+			PartitionablePartitionId partitionId = theEntity.getPartitionId();
 			if (partitionId != null && partitionId.getPartitionId() != null) {
 				PartitionEntity persistedPartition = myPartitionLookupSvc.getPartitionById(partitionId.getPartitionId());
 				retVal.setUserData(Constants.RESOURCE_PARTITION_ID, persistedPartition.toRequestPartitionId());
@@ -1035,8 +1031,8 @@ public abstract class BaseHapiFhirDao<T extends IBaseResource> extends BaseStora
 
 			entity.setDeleted(theDeletedTimestampOrNull);
 			entity.setUpdated(theDeletedTimestampOrNull);
-			entity.setNarrativeTextParsedIntoWords(null);
-			entity.setContentTextParsedIntoWords(null);
+			entity.setNarrativeText(null);
+			entity.setContentText(null);
 			entity.setHashSha256(null);
 			entity.setIndexStatus(INDEX_STATUS_INDEXED);
 			changed = populateResourceIntoEntity(theRequest, theResource, entity, true);
@@ -1060,10 +1056,10 @@ public abstract class BaseHapiFhirDao<T extends IBaseResource> extends BaseStora
 						entity.setLanguage(((IAnyResource) theResource).getLanguageElement().getValue());
 					}
 
-					newParams.setParamsOn(entity);
+					newParams.populateResourceTableSearchParamsPresentFlags(entity);
 					entity.setIndexStatus(INDEX_STATUS_INDEXED);
-					populateFullTextFields(myContext, theResource, entity);
 				}
+				populateFullTextFields(myContext, theResource, entity);
 			} else {
 
 				changed = populateResourceIntoEntity(theRequest, theResource, entity, false);
@@ -1209,6 +1205,8 @@ public abstract class BaseHapiFhirDao<T extends IBaseResource> extends BaseStora
 				// Synchronize search param indexes
 				AddRemoveCount searchParamAddRemoveCount = myDaoSearchParamSynchronizer.synchronizeSearchParamsToDatabase(newParams, entity, existingParams);
 
+				newParams.populateResourceTableParamCollections(entity);
+
 				// Interceptor broadcast: JPA_PERFTRACE_INFO
 				if (!searchParamAddRemoveCount.isEmpty()) {
 					if (JpaInterceptorBroadcaster.hasHooks(Pointcut.JPA_PERFTRACE_INFO, myInterceptorBroadcaster, theRequest)) {
@@ -1247,7 +1245,7 @@ public abstract class BaseHapiFhirDao<T extends IBaseResource> extends BaseStora
 
 		// Notify interceptors
 		ActionRequestDetails requestDetails;
-		if (theRequestDetails != null) {
+		if (theRequestDetails != null && theRequestDetails.getServer() != null) {
 			requestDetails = new ActionRequestDetails(theRequestDetails, theResource, theResourceId.getResourceType(), theResourceId);
 			notifyInterceptors(RestOperationTypeEnum.UPDATE, requestDetails);
 		}
@@ -1259,7 +1257,7 @@ public abstract class BaseHapiFhirDao<T extends IBaseResource> extends BaseStora
 			.add(RequestDetails.class, theRequestDetails)
 			.addIfMatchesType(ServletRequestDetails.class, theRequestDetails)
 			.add(TransactionDetails.class, theTransactionDetails);
-		doCallHooks(theRequestDetails, Pointcut.STORAGE_PRESTORAGE_RESOURCE_UPDATED, hookParams);
+		doCallHooks(theTransactionDetails, theRequestDetails, Pointcut.STORAGE_PRESTORAGE_RESOURCE_UPDATED, hookParams);
 
 		// Perform update
 		ResourceTable savedEntity = updateEntity(theRequestDetails, theResource, entity, null, thePerformIndexing, thePerformIndexing, theTransactionDetails, theForceUpdateVersion, thePerformIndexing);
@@ -1284,18 +1282,13 @@ public abstract class BaseHapiFhirDao<T extends IBaseResource> extends BaseStora
 
 		// Notify interceptors
 		if (!savedEntity.isUnchangedInCurrentOperation()) {
-			TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronizationAdapter() {
-				@Override
-				public void beforeCommit(boolean readOnly) {
-					HookParams hookParams = new HookParams()
-						.add(IBaseResource.class, theOldResource)
-						.add(IBaseResource.class, theResource)
-						.add(RequestDetails.class, theRequestDetails)
-						.addIfMatchesType(ServletRequestDetails.class, theRequestDetails)
-						.add(TransactionDetails.class, theTransactionDetails);
-					doCallHooks(theRequestDetails, Pointcut.STORAGE_PRECOMMIT_RESOURCE_UPDATED, hookParams);
-				}
-			});
+			hookParams = new HookParams()
+				.add(IBaseResource.class, theOldResource)
+				.add(IBaseResource.class, theResource)
+				.add(RequestDetails.class, theRequestDetails)
+				.addIfMatchesType(ServletRequestDetails.class, theRequestDetails)
+				.add(TransactionDetails.class, theTransactionDetails);
+			doCallHooks(theTransactionDetails, theRequestDetails, Pointcut.STORAGE_PRECOMMIT_RESOURCE_UPDATED, hookParams);
 		}
 
 		return savedEntity;
@@ -1462,8 +1455,7 @@ public abstract class BaseHapiFhirDao<T extends IBaseResource> extends BaseStora
 
 		StringBuilder retVal = new StringBuilder();
 		List<IPrimitiveType<String>> childElements = theContext.newTerser().getAllPopulatedChildElementsOfType(theResource, stringType);
-		for (@SuppressWarnings("rawtypes")
-			IPrimitiveType<String> nextType : childElements) {
+		for (IPrimitiveType<String> nextType : childElements) {
 			if (stringType.equals(nextType.getClass())) {
 				String nextValue = nextType.getValueAsString();
 				if (isNotBlank(nextValue)) {
@@ -1475,13 +1467,13 @@ public abstract class BaseHapiFhirDao<T extends IBaseResource> extends BaseStora
 		return retVal.toString();
 	}
 
-	public static void clearRequestAsProcessingSubRequest(ServletRequestDetails theRequestDetails) {
+	public static void clearRequestAsProcessingSubRequest(RequestDetails theRequestDetails) {
 		if (theRequestDetails != null) {
 			theRequestDetails.getUserData().remove(PROCESSING_SUB_REQUEST);
 		}
 	}
 
-	public static void markRequestAsProcessingSubRequest(ServletRequestDetails theRequestDetails) {
+	public static void markRequestAsProcessingSubRequest(RequestDetails theRequestDetails) {
 		if (theRequestDetails != null) {
 			theRequestDetails.getUserData().put(PROCESSING_SUB_REQUEST, Boolean.TRUE);
 		}
@@ -1489,11 +1481,11 @@ public abstract class BaseHapiFhirDao<T extends IBaseResource> extends BaseStora
 
 	public static void populateFullTextFields(final FhirContext theContext, final IBaseResource theResource, ResourceTable theEntity) {
 		if (theEntity.getDeleted() != null) {
-			theEntity.setNarrativeTextParsedIntoWords(null);
-			theEntity.setContentTextParsedIntoWords(null);
+			theEntity.setNarrativeText(null);
+			theEntity.setContentText(null);
 		} else {
-			theEntity.setNarrativeTextParsedIntoWords(parseNarrativeTextIntoWords(theResource));
-			theEntity.setContentTextParsedIntoWords(parseContentTextIntoWords(theContext, theResource));
+			theEntity.setNarrativeText(parseNarrativeTextIntoWords(theResource));
+			theEntity.setContentText(parseContentTextIntoWords(theContext, theResource));
 		}
 	}
 

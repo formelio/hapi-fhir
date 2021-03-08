@@ -3,7 +3,6 @@ package ca.uhn.fhir.jpa.api.config;
 import ca.uhn.fhir.jpa.api.model.WarmCacheEntry;
 import ca.uhn.fhir.jpa.model.entity.ModelConfig;
 import ca.uhn.fhir.jpa.model.entity.ResourceEncodingEnum;
-import ca.uhn.fhir.jpa.model.entity.ResourceIndexedSearchParamDate;
 import ca.uhn.fhir.rest.api.SearchTotalModeEnum;
 import ca.uhn.fhir.util.HapiExtensions;
 import com.google.common.annotations.VisibleForTesting;
@@ -26,7 +25,7 @@ import java.util.TreeSet;
  * #%L
  * HAPI FHIR JPA API
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -80,11 +79,11 @@ public class DaoConfig {
 	 * @see #setMaximumSearchResultCountInTransaction(Integer)
 	 */
 	private static final Integer DEFAULT_MAXIMUM_SEARCH_RESULT_COUNT_IN_TRANSACTION = null;
+	private static final Integer DEFAULT_MAXIMUM_TRANSACTION_BUNDLE_SIZE = null;
 	private static final Logger ourLog = LoggerFactory.getLogger(DaoConfig.class);
 	private static final int DEFAULT_EXPUNGE_BATCH_SIZE = 800;
-	private IndexEnabledEnum myIndexMissingFieldsEnabled = IndexEnabledEnum.DISABLED;
 	private static final int DEFAULT_MAXIMUM_DELETE_CONFLICT_COUNT = 60;
-
+	private IndexEnabledEnum myIndexMissingFieldsEnabled = IndexEnabledEnum.DISABLED;
 	/**
 	 * Child Configurations
 	 */
@@ -126,6 +125,8 @@ public class DaoConfig {
 	private boolean myIndexContainedResources = true;
 	private int myMaximumExpansionSize = DEFAULT_MAX_EXPANSION_SIZE;
 	private Integer myMaximumSearchResultCountInTransaction = DEFAULT_MAXIMUM_SEARCH_RESULT_COUNT_IN_TRANSACTION;
+
+	private Integer myMaximumTransactionBundleSize = DEFAULT_MAXIMUM_TRANSACTION_BUNDLE_SIZE;
 	private ResourceEncodingEnum myResourceEncoding = ResourceEncodingEnum.JSONC;
 	/**
 	 * update setter javadoc if default changes
@@ -141,6 +142,7 @@ public class DaoConfig {
 	private IdStrategyEnum myResourceServerIdStrategy = IdStrategyEnum.SEQUENTIAL_NUMERIC;
 	private boolean myMarkResourcesForReindexingUponSearchParameterChange;
 	private boolean myExpungeEnabled;
+	private boolean myDeleteExpungeEnabled;
 	private int myExpungeBatchSize = DEFAULT_EXPUNGE_BATCH_SIZE;
 	private int myReindexThreadCount;
 	private int myExpungeThreadCount;
@@ -192,6 +194,32 @@ public class DaoConfig {
 	 * @since 5.0.0
 	 */
 	private boolean myDeleteEnabled = true;
+	/**
+	 * @since 5.1.0
+	 */
+	private boolean myLastNEnabled = false;
+	/**
+	 * @since 5.2.0
+	 */
+	private boolean myUseLegacySearchBuilder = false;
+
+	/**
+	 * Constructor
+	 */
+	public DaoConfig() {
+		setSubscriptionEnabled(true);
+		setSubscriptionPollDelay(0);
+		setSubscriptionPurgeInactiveAfterMillis(Long.MAX_VALUE);
+		setMarkResourcesForReindexingUponSearchParameterChange(true);
+		setReindexThreadCount(Runtime.getRuntime().availableProcessors());
+		setExpungeThreadCount(Runtime.getRuntime().availableProcessors());
+		setBundleTypesAllowedForStorage(DEFAULT_BUNDLE_TYPES_ALLOWED_FOR_STORAGE);
+
+		if ("true".equalsIgnoreCase(System.getProperty(DISABLE_STATUS_BASED_REINDEX))) {
+			ourLog.info("Status based reindexing is DISABLED");
+			setStatusBasedReindexingDisabled(true);
+		}
+	}
 
 	/**
 	 * If set to <code>true</code> (default is <code>false</code>) the <code>$lastn</code> operation will be enabled for
@@ -218,31 +246,27 @@ public class DaoConfig {
 	}
 
 	/**
-	 * @since 5.1.0
+	 * This method controls whether to use the new non-hibernate search SQL builder that was introduced in HAPI FHIR 5.2.0.
+	 * By default this will be <code>false</code> meaning that the new SQL builder is used. Set to <code>true</code> to use the
+	 * legacy SQL builder based on Hibernate.
+	 * <p>Note that this method will be removed in HAPI FHIR 5.4.0</p>
+	 *
+	 * @since 5.3.0
 	 */
-	private boolean myLastNEnabled = false;
+	public boolean isUseLegacySearchBuilder() {
+		return myUseLegacySearchBuilder;
+	}
 
 	/**
-	 * @since 5.1.0
+	 * This method controls whether to use the new non-hibernate search SQL builder that was introduced in HAPI FHIR 5.2.0.
+	 * By default this will be <code>false</code> meaning that the new SQL builder is used. Set to <code>true</code> to use the
+	 * legacy SQL builder based on Hibernate.
+	 * <p>Note that this method will be removed in HAPI FHIR 5.4.0</p>
+	 *
+	 * @since 5.3.0
 	 */
-	private boolean myPreloadBlobFromInputStream = false;
-
-	/**
-	 * Constructor
-	 */
-	public DaoConfig() {
-		setSubscriptionEnabled(true);
-		setSubscriptionPollDelay(0);
-		setSubscriptionPurgeInactiveAfterMillis(Long.MAX_VALUE);
-		setMarkResourcesForReindexingUponSearchParameterChange(true);
-		setReindexThreadCount(Runtime.getRuntime().availableProcessors());
-		setExpungeThreadCount(Runtime.getRuntime().availableProcessors());
-		setBundleTypesAllowedForStorage(DEFAULT_BUNDLE_TYPES_ALLOWED_FOR_STORAGE);
-
-		if ("true".equalsIgnoreCase(System.getProperty(DISABLE_STATUS_BASED_REINDEX))) {
-			ourLog.info("Status based reindexing is DISABLED");
-			setStatusBasedReindexingDisabled(true);
-		}
+	public void setUseLegacySearchBuilder(boolean theUseLegacySearchBuilder) {
+		myUseLegacySearchBuilder = theUseLegacySearchBuilder;
 	}
 
 	/**
@@ -661,6 +685,31 @@ public class DaoConfig {
 	}
 
 	/**
+	 * Specifies the maximum number of resources permitted within a single transaction bundle.
+	 * If a transaction bundle is submitted with more than this number of resources, it will be
+	 * rejected with a PayloadTooLarge exception.
+	 * <p>
+	 * The default value is <code>null</code>, which means that there is no limit.
+	 * </p>
+	 */
+	public Integer getMaximumTransactionBundleSize() {
+		return myMaximumTransactionBundleSize;
+	}
+
+	/**
+	 * Specifies the maximum number of resources permitted within a single transaction bundle.
+	 * If a transaction bundle is submitted with more than this number of resources, it will be
+	 * rejected with a PayloadTooLarge exception.
+	 * <p>
+	 * The default value is <code>null</code>, which means that there is no limit.
+	 * </p>
+	 */
+	public DaoConfig setMaximumTransactionBundleSize(Integer theMaximumTransactionBundleSize) {
+		myMaximumTransactionBundleSize = theMaximumTransactionBundleSize;
+		return this;
+	}
+
+	/**
 	 * This setting controls the number of threads allocated to resource reindexing
 	 * (which is only ever used if SearchParameters change, or a manual reindex is
 	 * triggered due to a HAPI FHIR upgrade or some other reason).
@@ -972,43 +1021,6 @@ public class DaoConfig {
 	}
 
 	/**
-	 * <p>
-	 * Should searches use the integer field {@code SP_VALUE_LOW_DATE_ORDINAL} and {@code SP_VALUE_HIGH_DATE_ORDINAL} in
-	 * {@link ca.uhn.fhir.jpa.model.entity.ResourceIndexedSearchParamDate} when resolving searches where all predicates are using
-	 * precision of {@link ca.uhn.fhir.model.api.TemporalPrecisionEnum#DAY}.
-	 *
-	 * For example, if enabled, the search of {@code Observation?date=2020-02-25} will cause the date to be collapsed down to an
-	 * ordinal {@code 20200225}. It would then be compared against {@link ResourceIndexedSearchParamDate#getValueLowDateOrdinal()}
-	 * and {@link ResourceIndexedSearchParamDate#getValueHighDateOrdinal()}
-	 * </p>
-	 * Default is {@literal true} beginning in HAPI FHIR 5.0
-	 * </p>
-	 *
-	 * @since 5.0
-	 */
-	public void setUseOrdinalDatesForDayPrecisionSearches(boolean theUseOrdinalDates) {
-		myModelConfig.setUseOrdinalDatesForDayPrecisionSearches(theUseOrdinalDates);
-	}
-
-	/**
-	 * <p>
-	 * Should searches use the integer field {@code SP_VALUE_LOW_DATE_ORDINAL} and {@code SP_VALUE_HIGH_DATE_ORDINAL} in
-	 * {@link ca.uhn.fhir.jpa.model.entity.ResourceIndexedSearchParamDate} when resolving searches where all predicates are using
-	 * precision of {@link ca.uhn.fhir.model.api.TemporalPrecisionEnum#DAY}.
-	 *
-	 * For example, if enabled, the search of {@code Observation?date=2020-02-25} will cause the date to be collapsed down to an
-	 *  integer representing the ordinal date {@code 20200225}. It would then be compared against {@link ResourceIndexedSearchParamDate#getValueLowDateOrdinal()}
-	 * and {@link ResourceIndexedSearchParamDate#getValueHighDateOrdinal()}
-	 * </p>
-	 * Default is {@literal true} beginning in HAPI FHIR 5.0
-	 * </p>
-	 *
-	 * @since 5.0
-	 */
-	public boolean getUseOrdinalDatesForDayPrecisionSearches() {
-		return myModelConfig.getUseOrdinalDatesForDayPrecisionSearches();
-	}
-	/**
 	 * @see #setAllowInlineMatchUrlReferences(boolean)
 	 */
 	public boolean isAllowInlineMatchUrlReferences() {
@@ -1283,6 +1295,42 @@ public class DaoConfig {
 	 */
 	public boolean isExpungeEnabled() {
 		return myExpungeEnabled;
+	}
+
+	/**
+	 * If set to <code>true</code> (default is <code>false</code>), the _expunge parameter on the DELETE
+	 * operation will be enabled on this server. DELETE _expunge removes all data associated with a resource in a highly performant
+	 * way, skipping most of the the checks that are enforced with usual DELETE operations.  The only check
+	 * that is performed before deleting the resources and their indexes is that no other resources reference the resources about to
+	 * be deleted.  This operation is potentially dangerous since it allows
+	 * a client to physically delete data in a way that can not be recovered (without resorting
+	 * to backups).
+	 * <p>
+	 * It is recommended to not enable this setting without appropriate security
+	 * in place on your server to prevent non-administrators from using this
+	 * operation.
+	 * </p>
+	 */
+	public void setDeleteExpungeEnabled(boolean theDeleteExpungeEnabled) {
+		myDeleteExpungeEnabled = theDeleteExpungeEnabled;
+	}
+
+	/**
+	 * If set to <code>true</code> (default is <code>false</code>), the _expunge parameter on the DELETE
+	 * operation will be enabled on this server. DELETE _expunge removes all data associated with a resource in a highly performant
+	 * way, skipping most of the the checks that are enforced with usual DELETE operations.  The only check
+	 * that is performed before deleting the data is that no other resources reference the resources about to
+	 * be deleted.  This operation is potentially dangerous since it allows
+	 * a client to physically delete data in a way that can not be recovered (without resorting
+	 * to backups).
+	 * <p>
+	 * It is recommended to not enable this setting without appropriate security
+	 * in place on your server to prevent non-administrators from using this
+	 * operation.
+	 * </p>
+	 */
+	public boolean isDeleteExpungeEnabled() {
+		return myDeleteExpungeEnabled;
 	}
 
 	/**
@@ -1973,8 +2021,8 @@ public class DaoConfig {
 	 *
 	 * @since 5.0.0
 	 */
-	public void setDeleteEnabled(boolean theDeleteEnabled) {
-		myDeleteEnabled = theDeleteEnabled;
+	public boolean isDeleteEnabled() {
+		return myDeleteEnabled;
 	}
 
 	/**
@@ -1986,78 +2034,8 @@ public class DaoConfig {
 	 *
 	 * @since 5.0.0
 	 */
-	public boolean isDeleteEnabled() {
-		return myDeleteEnabled;
-	}
-
-    public enum StoreMetaSourceInformationEnum {
-		NONE(false, false),
-		SOURCE_URI(true, false),
-		REQUEST_ID(false, true),
-		SOURCE_URI_AND_REQUEST_ID(true, true);
-
-		private final boolean myStoreSourceUri;
-		private final boolean myStoreRequestId;
-
-		StoreMetaSourceInformationEnum(boolean theStoreSourceUri, boolean theStoreRequestId) {
-			myStoreSourceUri = theStoreSourceUri;
-			myStoreRequestId = theStoreRequestId;
-		}
-
-		public boolean isStoreSourceUri() {
-			return myStoreSourceUri;
-		}
-
-		public boolean isStoreRequestId() {
-			return myStoreRequestId;
-		}
-	}
-
-	public enum IndexEnabledEnum {
-		ENABLED,
-		DISABLED
-	}
-
-	public enum IdStrategyEnum {
-		/**
-		 * This strategy is the default strategy, and it simply uses a sequential
-		 * numeric ID for each newly created resource.
-		 */
-		SEQUENTIAL_NUMERIC,
-		/**
-		 * Each resource will receive a randomly generated UUID
-		 */
-		UUID
-	}
-
-	public enum ClientIdStrategyEnum {
-		/**
-		 * Clients are not allowed to supply IDs for resources that do not
-		 * already exist
-		 */
-		NOT_ALLOWED,
-
-		/**
-		 * Clients may supply IDs but these IDs are not permitted to be purely
-		 * numeric. In other words, values such as "A", "A1" and "000A" would be considered
-		 * valid but "123" would not.
-		 * <p><b>This is the default setting.</b></p>
-		 */
-		ALPHANUMERIC,
-
-		/**
-		 * Clients may supply any ID including purely numeric IDs. Note that this setting should
-		 * only be set on an empty database, or on a database that has always had this setting
-		 * set as it causes a "forced ID" to be used for all resources.
-		 * <p>
-		 * Note that if you use this setting, it is highly recommended that you also
-		 * set the {@link #setResourceServerIdStrategy(IdStrategyEnum) ResourceServerIdStrategy}
-		 * to {@link IdStrategyEnum#UUID} in order to avoid any potential for conflicts. Otherwise
-		 * a database sequence will be used to generate IDs and these IDs can conflict with
-		 * client-assigned numeric IDs.
-		 * </P>
-		 */
-		ANY
+	public void setDeleteEnabled(boolean theDeleteEnabled) {
+		myDeleteEnabled = theDeleteEnabled;
 	}
 
 	/**
@@ -2102,28 +2080,87 @@ public class DaoConfig {
 	 * </p>
 	 *
 	 * @since 5.1.0
+	 * @deprecated In 5.2.0 this setting no longer does anything
 	 */
-	public boolean isPreloadBlobFromInputStream() {
-		return myPreloadBlobFromInputStream;
+	@Deprecated
+	public void setPreloadBlobFromInputStream(Boolean thePreloadBlobFromInputStream) {
+		// ignore
+	}
+
+	public enum StoreMetaSourceInformationEnum {
+		NONE(false, false),
+		SOURCE_URI(true, false),
+		REQUEST_ID(false, true),
+		SOURCE_URI_AND_REQUEST_ID(true, true);
+
+		private final boolean myStoreSourceUri;
+		private final boolean myStoreRequestId;
+
+		StoreMetaSourceInformationEnum(boolean theStoreSourceUri, boolean theStoreRequestId) {
+			myStoreSourceUri = theStoreSourceUri;
+			myStoreRequestId = theStoreRequestId;
+		}
+
+		public boolean isStoreSourceUri() {
+			return myStoreSourceUri;
+		}
+
+		public boolean isStoreRequestId() {
+			return myStoreRequestId;
+		}
+	}
+
+	public enum IndexEnabledEnum {
+		ENABLED,
+		DISABLED
 	}
 
 	/**
-	 * <p>
-	 * This determines whether $binary-access-write operations should first load the InputStream into memory before persisting the
-	 * contents to the database. This needs to be enabled for MS SQL Server as this DB requires that the blob size be known
-	 * in advance.
-	 * </p>
-	 * <p>
-	 * Note that this setting should be enabled with caution as it can lead to significant demands on memory.
-	 * </p>
-	 * <p>
-	 * The default value for this setting is {@code false}.
-	 * </p>
-	 *
-	 * @since 5.1.0
+	 * This enum provides allowable options for {@link #setResourceServerIdStrategy(IdStrategyEnum)}
 	 */
-	public void setPreloadBlobFromInputStream(Boolean thePreloadBlobFromInputStream) {
-		myPreloadBlobFromInputStream = thePreloadBlobFromInputStream;
+	public enum IdStrategyEnum {
+		/**
+		 * This strategy is the default strategy, and it simply uses a sequential
+		 * numeric ID for each newly created resource.
+		 */
+		SEQUENTIAL_NUMERIC,
+		/**
+		 * Each resource will receive a randomly generated UUID
+		 */
+		UUID
+	}
+
+	/**
+	 * This enum provides allowable options for {@link #setResourceClientIdStrategy(ClientIdStrategyEnum)}
+	 */
+	public enum ClientIdStrategyEnum {
+		/**
+		 * Clients are not allowed to supply IDs for resources that do not
+		 * already exist
+		 */
+		NOT_ALLOWED,
+
+		/**
+		 * Clients may supply IDs but these IDs are not permitted to be purely
+		 * numeric. In other words, values such as "A", "A1" and "000A" would be considered
+		 * valid but "123" would not.
+		 * <p><b>This is the default setting.</b></p>
+		 */
+		ALPHANUMERIC,
+
+		/**
+		 * Clients may supply any ID including purely numeric IDs. Note that this setting should
+		 * only be set on an empty database, or on a database that has always had this setting
+		 * set as it causes a "forced ID" to be used for all resources.
+		 * <p>
+		 * Note that if you use this setting, it is highly recommended that you also
+		 * set the {@link #setResourceServerIdStrategy(IdStrategyEnum) ResourceServerIdStrategy}
+		 * to {@link IdStrategyEnum#UUID} in order to avoid any potential for conflicts. Otherwise
+		 * a database sequence will be used to generate IDs and these IDs can conflict with
+		 * client-assigned numeric IDs.
+		 * </p>
+		 */
+		ANY
 	}
 
 }

@@ -4,7 +4,7 @@ package ca.uhn.fhir.jpa.subscription.model;
  * #%L
  * HAPI FHIR Subscription Server
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ package ca.uhn.fhir.jpa.subscription.model;
  * #L%
  */
 
+import ca.uhn.fhir.rest.server.messaging.json.BaseJsonMessage;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 

@@ -4,7 +4,7 @@ package ca.uhn.fhir.rest.server;
  * #%L
  * HAPI FHIR - Server Framework
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -63,6 +63,15 @@ public class SimpleBundleProvider implements IBundleProvider {
 		myList = theList;
 		myUuid = theUuid;
 		setSize(theList.size());
+	}
+
+	/**
+	 * Constructor that provides only a size but no actual data (useful for _count = 0)
+	 */
+	public SimpleBundleProvider(int theSize) {
+		myList = Collections.emptyList();
+		myUuid = null;
+		setSize(theSize);
 	}
 
 	/**

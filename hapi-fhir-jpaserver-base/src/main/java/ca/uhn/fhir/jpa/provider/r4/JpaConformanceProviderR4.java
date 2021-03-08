@@ -4,7 +4,7 @@ package ca.uhn.fhir.jpa.provider.r4;
  * #%L
  * HAPI FHIR JPA Server
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,6 +44,7 @@ import org.hl7.fhir.r4.model.Extension;
 import org.hl7.fhir.r4.model.Meta;
 import org.hl7.fhir.r4.model.UriType;
 
+import javax.annotation.Nonnull;
 import javax.servlet.http.HttpServletRequest;
 import java.util.Collection;
 import java.util.Collections;
@@ -75,12 +76,13 @@ public class JpaConformanceProviderR4 extends org.hl7.fhir.r4.hapi.rest.server.S
 	/**
 	 * Constructor
 	 */
-	public JpaConformanceProviderR4(RestfulServer theRestfulServer, IFhirSystemDao<Bundle, Meta> theSystemDao, DaoConfig theDaoConfig, ISearchParamRegistry theSearchParamRegistry) {
+	public JpaConformanceProviderR4(@Nonnull RestfulServer theRestfulServer, @Nonnull IFhirSystemDao<Bundle, Meta> theSystemDao, @Nonnull DaoConfig theDaoConfig, @Nonnull ISearchParamRegistry theSearchParamRegistry) {
 		super(theRestfulServer);
 
 		Validate.notNull(theRestfulServer);
 		Validate.notNull(theSystemDao);
 		Validate.notNull(theDaoConfig);
+		Validate.notNull(theSearchParamRegistry);
 
 		myRestfulServer = theRestfulServer;
 		mySystemDao = theSystemDao;

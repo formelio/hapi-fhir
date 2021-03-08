@@ -4,7 +4,7 @@ package ca.uhn.fhir.jpa.term.api;
  * #%L
  * HAPI FHIR JPA Server
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,6 +40,8 @@ import java.util.List;
 public interface ITermCodeSystemStorageSvc {
 
 	void deleteCodeSystem(TermCodeSystem theCodeSystem);
+
+	void deleteCodeSystemVersion(TermCodeSystemVersion theCodeSystemVersion);
 
 	void storeNewCodeSystemVersion(ResourcePersistentId theCodeSystemResourcePid, String theSystemUri, String theSystemName, String theSystemVersionId, TermCodeSystemVersion theCodeSystemVersion, ResourceTable theCodeSystemResourceTable);
 

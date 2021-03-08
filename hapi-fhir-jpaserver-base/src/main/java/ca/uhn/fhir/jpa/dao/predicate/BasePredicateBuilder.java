@@ -4,7 +4,7 @@ package ca.uhn.fhir.jpa.dao.predicate;
  * #%L
  * HAPI FHIR JPA Server
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ package ca.uhn.fhir.jpa.dao.predicate;
 import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.interceptor.model.RequestPartitionId;
 import ca.uhn.fhir.jpa.api.config.DaoConfig;
-import ca.uhn.fhir.jpa.dao.SearchBuilder;
+import ca.uhn.fhir.jpa.dao.LegacySearchBuilder;
 import ca.uhn.fhir.jpa.dao.predicate.querystack.QueryStack;
 import ca.uhn.fhir.jpa.model.config.PartitionSettings;
 import ca.uhn.fhir.jpa.model.entity.BasePartitionable;
@@ -63,7 +63,7 @@ abstract class BasePredicateBuilder {
 	@Autowired
 	private PartitionSettings myPartitionSettings;
 
-	BasePredicateBuilder(SearchBuilder theSearchBuilder) {
+	BasePredicateBuilder(LegacySearchBuilder theSearchBuilder) {
 		myCriteriaBuilder = theSearchBuilder.getBuilder();
 		myQueryStack = theSearchBuilder.getQueryStack();
 		myResourceType = theSearchBuilder.getResourceType();
@@ -92,10 +92,10 @@ abstract class BasePredicateBuilder {
 
 	void addPredicateParamMissingForNonReference(String theResourceName, String theParamName, boolean theMissing, From<?, ? extends BaseResourceIndexedSearchParam> theJoin, RequestPartitionId theRequestPartitionId) {
 		if (!theRequestPartitionId.isAllPartitions()) {
-			if (theRequestPartitionId.getPartitionId() != null) {
-				myQueryStack.addPredicate(myCriteriaBuilder.equal(theJoin.get("myPartitionIdValue"), theRequestPartitionId.getPartitionId()));
-			} else {
+			if (theRequestPartitionId.isDefaultPartition()) {
 				myQueryStack.addPredicate(myCriteriaBuilder.isNull(theJoin.get("myPartitionIdValue")));
+			} else {
+				myQueryStack.addPredicate(theJoin.get("myPartitionIdValue").in(theRequestPartitionId.getPartitionIds()));
 			}
 		}
 		myQueryStack.addPredicateWithImplicitTypeSelection(myCriteriaBuilder.equal(theJoin.get("myResourceType"), theResourceName));
@@ -172,7 +172,7 @@ abstract class BasePredicateBuilder {
 			case ENDS_BEFORE:
 			case STARTS_AFTER:
 			default:
-				String msg = myContext.getLocalizer().getMessage(SearchBuilder.class, invalidMessageName, thePrefix.getValue(), theParam.getValueAsQueryToken(myContext));
+				String msg = myContext.getLocalizer().getMessage(LegacySearchBuilder.class, invalidMessageName, thePrefix.getValue(), theParam.getValueAsQueryToken(myContext));
 				throw new InvalidRequestException(msg);
 		}
 
@@ -184,12 +184,11 @@ abstract class BasePredicateBuilder {
 
 	void addPartitionIdPredicate(RequestPartitionId theRequestPartitionId, From<?, ? extends BasePartitionable> theJoin, List<Predicate> theCodePredicates) {
 		if (!theRequestPartitionId.isAllPartitions()) {
-			Integer partitionId = theRequestPartitionId.getPartitionId();
 			Predicate partitionPredicate;
-			if (partitionId != null) {
-				partitionPredicate = myCriteriaBuilder.equal(theJoin.get("myPartitionIdValue").as(Integer.class), partitionId);
-			} else {
+			if (theRequestPartitionId.isDefaultPartition()) {
 				partitionPredicate = myCriteriaBuilder.isNull(theJoin.get("myPartitionIdValue").as(Integer.class));
+			} else {
+				partitionPredicate = theJoin.get("myPartitionIdValue").as(Integer.class).in(theRequestPartitionId.getPartitionIds());
 			}
 			myQueryStack.addPredicate(partitionPredicate);
 		}

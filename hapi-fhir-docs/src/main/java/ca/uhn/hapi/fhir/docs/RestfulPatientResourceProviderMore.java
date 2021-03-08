@@ -4,7 +4,7 @@ package ca.uhn.hapi.fhir.docs;
  * #%L
  * HAPI FHIR - Docs
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -148,6 +148,43 @@ public List<Patient> findPatients(
    return retVal;
 }
 //END SNIPPET: sort
+
+//START SNIPPET: count
+@Search
+public List<Patient> findPatients(
+	@RequiredParam(name=Patient.SP_IDENTIFIER) StringParam theParameter,
+	@Count Integer theCount) {
+	List<Patient> retVal=new ArrayList<Patient>(); // populate this
+
+	// count is null unless a _count parameter is actually provided
+	if (theCount != null) {
+		// ... do search with count ...
+	} else {
+		// ... do search without count ...
+	}
+
+	return retVal;
+}
+//END SNIPPET: count
+
+//START SNIPPET: offset
+@Search
+public List<Patient> findPatients(
+	@RequiredParam(name=Patient.SP_IDENTIFIER) StringParam theParameter,
+	@Offset Integer theOffset,
+	@Count Integer theCount) {
+	List<Patient> retVal=new ArrayList<Patient>(); // populate this
+
+	// offset is null unless a _offset parameter is actually provided
+	if (theOffset != null) {
+		// ... do search with offset ...
+	} else {
+		// ... do search without offset ...
+	}
+
+	return retVal;
+}
+//END SNIPPET: offset
 
 //START SNIPPET: underlyingReq
 @Search

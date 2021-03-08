@@ -53,9 +53,9 @@ public class FhirResourceDaoDstu2ValidateTest extends BaseJpaDstu2Test {
 
 		String ooString = myFhirCtx.newJsonParser().setPrettyPrint(true).encodeResourceToString(outcome);
 		ourLog.info(ooString);
-		assertThat(ooString, containsString("Element 'Observation.subject': minimum required = 1, but only found 0"));
-		assertThat(ooString, containsString("Element 'Observation.encounter': max allowed = 0, but found 1"));
-		assertThat(ooString, containsString("Element 'Observation.device': minimum required = 1, but only found 0"));
+		assertThat(ooString, containsString("Observation.subject: minimum required = 1, but only found 0"));
+		assertThat(ooString, containsString("Observation.encounter: max allowed = 0, but found 1"));
+		assertThat(ooString, containsString("Observation.device: minimum required = 1, but only found 0"));
 	}
 
 	@Test
@@ -65,9 +65,9 @@ public class FhirResourceDaoDstu2ValidateTest extends BaseJpaDstu2Test {
 
 		String ooString = myFhirCtx.newJsonParser().setPrettyPrint(true).encodeResourceToString(outcome);
 		ourLog.info(ooString);
-		assertThat(ooString, containsString("Element 'Observation.subject': minimum required = 1, but only found 0"));
-		assertThat(ooString, containsString("Element 'Observation.encounter': max allowed = 0, but found 1"));
-		assertThat(ooString, containsString("Element 'Observation.device': minimum required = 1, but only found 0"));
+		assertThat(ooString, containsString("Observation.subject: minimum required = 1, but only found 0"));
+		assertThat(ooString, containsString("Observation.encounter: max allowed = 0, but found 1"));
+		assertThat(ooString, containsString("Observation.device: minimum required = 1, but only found 0"));
 	}
 
 	private OperationOutcome doTestValidateResourceContainingProfileDeclaration(String methodName, EncodingEnum enc) throws IOException {
@@ -144,7 +144,7 @@ public class FhirResourceDaoDstu2ValidateTest extends BaseJpaDstu2Test {
 		} catch (PreconditionFailedException e) {
 			String ooString = myFhirCtx.newJsonParser().setPrettyPrint(true).encodeResourceToString(e.getOperationOutcome());
 			ourLog.info(ooString);
-			assertThat(ooString, containsString("Profile reference 'http://example.com/StructureDefinition/testValidateResourceContainingProfileDeclarationInvalid' could not be resolved, so has not been checked"));
+			assertThat(ooString, containsString("Profile reference 'http://example.com/StructureDefinition/testValidateResourceContainingProfileDeclarationInvalid' has not been checked because it is unknown"));
 		}
 
 	}

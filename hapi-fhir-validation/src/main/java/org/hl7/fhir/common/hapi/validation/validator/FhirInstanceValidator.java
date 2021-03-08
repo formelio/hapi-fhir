@@ -4,16 +4,12 @@ import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.context.FhirVersionEnum;
 import ca.uhn.fhir.context.support.DefaultProfileValidationSupport;
 import ca.uhn.fhir.context.support.IValidationSupport;
-import ca.uhn.fhir.context.support.ValidationSupportContext;
 import ca.uhn.fhir.validation.IInstanceValidatorModule;
 import ca.uhn.fhir.validation.IValidationContext;
 import org.apache.commons.lang3.Validate;
-import org.hl7.fhir.convertors.VersionConvertor_10_50;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.PathEngineException;
-import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.r5.model.Base;
-import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.r5.model.TypeDetails;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.utils.FHIRPathEngine;
@@ -33,13 +29,13 @@ public class FhirInstanceValidator extends BaseValidatorBridge implements IInsta
 	private BestPracticeWarningLevel myBestPracticeWarningLevel;
 	private IValidationSupport myValidationSupport;
 	private boolean noTerminologyChecks = false;
+	private boolean noExtensibleWarnings = false;
+	private boolean noBindingMsgSuppressed = false;
 	private volatile VersionSpecificWorkerContextWrapper myWrappedWorkerContext;
-	private boolean errorForUnknownProfiles;
+	private boolean errorForUnknownProfiles = true;
 	private boolean assumeValidRestReferences;
 	private List<String> myExtensionDomains = Collections.emptyList();
 	private IResourceValidator.IValidatorResourceFetcher validatorResourceFetcher;
-	private volatile FhirContext myDstu2Context;
-	private volatile FhirContext myHl7OrgDstu2Context;
 
 	/**
 	 * Constructor
@@ -136,8 +132,6 @@ public class FhirInstanceValidator extends BaseValidatorBridge implements IInsta
 	/**
 	 * Returns the {@link IValidationSupport validation support} in use by this validator. Default is an instance of
 	 * DefaultProfileValidationSupport if the no-arguments constructor for this object was used.
-	 *
-	 * @return
 	 */
 	public IValidationSupport getValidationSupport() {
 		return myValidationSupport;
@@ -192,6 +186,34 @@ public class FhirInstanceValidator extends BaseValidatorBridge implements IInsta
 		noTerminologyChecks = theNoTerminologyChecks;
 	}
 
+	/**
+	 * If set to {@literal true} (default is false) no extensible warnings suppressed
+	 */
+	public boolean isNoExtensibleWarnings() {
+		return noExtensibleWarnings;
+	}
+
+	/**
+	 * If set to {@literal true} (default is false) no extensible warnings is suppressed
+	 */
+	public void setNoExtensibleWarnings(final boolean theNoExtensibleWarnings) {
+		noExtensibleWarnings = theNoExtensibleWarnings;
+	}
+
+	/**
+	 * If set to {@literal true} (default is false) no binding message is suppressed
+	 */
+	public boolean isNoBindingMsgSuppressed() {
+		return noBindingMsgSuppressed;
+	}
+
+	/**
+	 * If set to {@literal true} (default is false) no binding message is suppressed
+	 */
+	public void setNoBindingMsgSuppressed(final boolean theNoBindingMsgSuppressed) {
+		noBindingMsgSuppressed = theNoBindingMsgSuppressed;
+	}
+
 	public List<String> getExtensionDomains() {
 		return myExtensionDomains;
 	}
@@ -206,6 +228,8 @@ public class FhirInstanceValidator extends BaseValidatorBridge implements IInsta
 			.setErrorForUnknownProfiles(isErrorForUnknownProfiles())
 			.setExtensionDomains(getExtensionDomains())
 			.setNoTerminologyChecks(isNoTerminologyChecks())
+			.setNoExtensibleWarnings(isNoExtensibleWarnings())
+			.setNoBindingMsgSuppressed(isNoBindingMsgSuppressed())
 			.setValidatorResourceFetcher(getValidatorResourceFetcher())
 			.setAssumeValidRestReferences(isAssumeValidRestReferences())
 			.validate(wrappedWorkerContext, theValidationCtx);
@@ -215,83 +239,10 @@ public class FhirInstanceValidator extends BaseValidatorBridge implements IInsta
 	protected VersionSpecificWorkerContextWrapper provideWorkerContext() {
 		VersionSpecificWorkerContextWrapper wrappedWorkerContext = myWrappedWorkerContext;
 		if (wrappedWorkerContext == null) {
-			VersionSpecificWorkerContextWrapper.IVersionTypeConverter converter;
-
-			switch (myValidationSupport.getFhirContext().getVersion().getVersion()) {
-				case DSTU2:
-				case DSTU2_HL7ORG: {
-					converter = new VersionSpecificWorkerContextWrapper.IVersionTypeConverter() {
-						@Override
-						public Resource toCanonical(IBaseResource theNonCanonical) {
-							IBaseResource nonCanonical = theNonCanonical;
-							Resource retVal = VersionConvertor_10_50.convertResource((org.hl7.fhir.dstu2.model.Resource) nonCanonical);
-							if (nonCanonical instanceof org.hl7.fhir.dstu2.model.ValueSet) {
-								org.hl7.fhir.dstu2.model.ValueSet valueSet = (org.hl7.fhir.dstu2.model.ValueSet) nonCanonical;
-								if (valueSet.hasCodeSystem() && valueSet.getCodeSystem().hasSystem()) {
-									if (!valueSet.hasCompose()) {
-										ValueSet valueSetR5 = (ValueSet) retVal;
-										valueSetR5.getCompose().addInclude().setSystem(valueSet.getCodeSystem().getSystem());
-									}
-								}
-							}
-							return retVal;
-						}
-
-						@Override
-						public IBaseResource fromCanonical(Resource theCanonical) {
-							IBaseResource canonical = VersionConvertor_10_50.convertResource(theCanonical);
-							return canonical;
-						}
-					};
-					break;
-				}
-
-				case DSTU2_1: {
-					converter = new VersionTypeConverterDstu21();
-					break;
-				}
-
-				case DSTU3: {
-					converter = new VersionTypeConverterDstu3();
-					break;
-				}
-
-				case R4: {
-					converter = new VersionTypeConverterR4();
-					break;
-				}
-
-				case R5: {
-					converter = VersionSpecificWorkerContextWrapper.IDENTITY_VERSION_TYPE_CONVERTER;
-					break;
-				}
-
-				default:
-					throw new IllegalStateException();
-			}
-
-			wrappedWorkerContext = new VersionSpecificWorkerContextWrapper(new ValidationSupportContext(myValidationSupport), converter);
+			wrappedWorkerContext = VersionSpecificWorkerContextWrapper.newVersionSpecificWorkerContextWrapper(myValidationSupport);
 		}
 		myWrappedWorkerContext = wrappedWorkerContext;
 		return wrappedWorkerContext;
-	}
-
-	private FhirContext getDstu2Context() {
-		FhirContext dstu2Context = myDstu2Context;
-		if (dstu2Context == null) {
-			dstu2Context = FhirContext.forDstu2();
-			myDstu2Context = dstu2Context;
-		}
-		return dstu2Context;
-	}
-
-	private FhirContext getHl7OrgDstu2Context() {
-		FhirContext hl7OrgDstu2Context = myHl7OrgDstu2Context;
-		if (hl7OrgDstu2Context == null) {
-			hl7OrgDstu2Context = FhirContext.forDstu2Hl7Org();
-			myHl7OrgDstu2Context = hl7OrgDstu2Context;
-		}
-		return hl7OrgDstu2Context;
 	}
 
 	public IResourceValidator.IValidatorResourceFetcher getValidatorResourceFetcher() {
@@ -349,7 +300,7 @@ public class FhirInstanceValidator extends BaseValidatorBridge implements IInsta
 		}
 
 		@Override
-		public List<Base> executeFunction(Object appContext, String functionName, List<List<Base>> parameters) {
+		public List<Base> executeFunction(Object appContext, List<Base> focus, String functionName, List<List<Base>> parameters) {
 			return null;
 		}
 

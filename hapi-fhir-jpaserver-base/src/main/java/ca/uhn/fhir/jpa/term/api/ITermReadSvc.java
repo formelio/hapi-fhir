@@ -10,9 +10,7 @@ import ca.uhn.fhir.jpa.entity.TermConceptMapGroupElement;
 import ca.uhn.fhir.jpa.entity.TermConceptMapGroupElementTarget;
 import ca.uhn.fhir.jpa.model.entity.ResourceTable;
 import ca.uhn.fhir.jpa.term.IValueSetConceptAccumulator;
-import ca.uhn.fhir.model.dstu2.composite.CodeableConceptDt;
-import ca.uhn.fhir.model.dstu2.composite.CodingDt;
-import ca.uhn.fhir.util.VersionIndependentConcept;
+import ca.uhn.fhir.util.FhirVersionIndependentConcept;
 import org.hl7.fhir.instance.model.api.IBaseCoding;
 import org.hl7.fhir.instance.model.api.IBaseDatatype;
 import org.hl7.fhir.instance.model.api.IBaseResource;
@@ -21,8 +19,8 @@ import org.hl7.fhir.instance.model.api.IPrimitiveType;
 import org.hl7.fhir.r4.model.CodeSystem;
 import org.hl7.fhir.r4.model.ConceptMap;
 import org.hl7.fhir.r4.model.ValueSet;
-import org.hl7.fhir.utilities.validation.ValidationOptions;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.List;
 import java.util.Optional;
@@ -32,7 +30,7 @@ import java.util.Set;
  * #%L
  * HAPI FHIR JPA Server
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -60,7 +58,11 @@ import java.util.Set;
  */
 public interface ITermReadSvc extends IValidationSupport {
 
-	ValueSet expandValueSet(@Nullable ValueSetExpansionOptions theExpansionOptions, ValueSet theValueSetToExpand);
+	ValueSet expandValueSet(@Nullable ValueSetExpansionOptions theExpansionOptions, @Nonnull String theValueSetCanonicalUrl, @Nullable String theExpansionFilter);
+
+	ValueSet expandValueSet(@Nullable ValueSetExpansionOptions theExpansionOptions, @Nonnull ValueSet theValueSetToExpand);
+
+	ValueSet expandValueSet(@Nullable ValueSetExpansionOptions theExpansionOptions, @Nonnull ValueSet theValueSetToExpand, @Nullable String theFilter);
 
 	void expandValueSet(@Nullable ValueSetExpansionOptions theExpansionOptions, ValueSet theValueSetToExpand, IValueSetConceptAccumulator theValueSetCodeAccumulator);
 
@@ -71,21 +73,21 @@ public interface ITermReadSvc extends IValidationSupport {
 
 	void expandValueSet(@Nullable ValueSetExpansionOptions theExpansionOptions, IBaseResource theValueSetToExpand, IValueSetConceptAccumulator theValueSetCodeAccumulator);
 
-	List<VersionIndependentConcept> expandValueSet(ValueSetExpansionOptions theExpansionOptions, String theValueSet);
+	List<FhirVersionIndependentConcept> expandValueSetIntoConceptList(ValueSetExpansionOptions theExpansionOptions, String theValueSetCanonicalUrl);
 
 	Optional<TermConcept> findCode(String theCodeSystem, String theCode);
 
 	Set<TermConcept> findCodesAbove(Long theCodeSystemResourcePid, Long theCodeSystemResourceVersionPid, String theCode);
 
-	List<VersionIndependentConcept> findCodesAbove(String theSystem, String theCode);
+	List<FhirVersionIndependentConcept> findCodesAbove(String theSystem, String theCode);
 
-	List<VersionIndependentConcept> findCodesAboveUsingBuiltInSystems(String theSystem, String theCode);
+	List<FhirVersionIndependentConcept> findCodesAboveUsingBuiltInSystems(String theSystem, String theCode);
 
 	Set<TermConcept> findCodesBelow(Long theCodeSystemResourcePid, Long theCodeSystemResourceVersionPid, String theCode);
 
-	List<VersionIndependentConcept> findCodesBelow(String theSystem, String theCode);
+	List<FhirVersionIndependentConcept> findCodesBelow(String theSystem, String theCode);
 
-	List<VersionIndependentConcept> findCodesBelowUsingBuiltInSystems(String theSystem, String theCode);
+	List<FhirVersionIndependentConcept> findCodesBelowUsingBuiltInSystems(String theSystem, String theCode);
 
 	CodeSystem fetchCanonicalCodeSystemFromCompleteContext(String theSystem);
 
@@ -121,5 +123,10 @@ public interface ITermReadSvc extends IValidationSupport {
 	 * Version independent
 	 */
 	boolean isValueSetPreExpandedForCodeValidation(IBaseResource theValueSet);
+
+	/**
+	 * Version independent
+	 */
+	CodeValidationResult codeSystemValidateCode(IIdType theCodeSystemId, String theValueSetUrl, String theVersion, String theCode, String theDisplay, IBaseDatatype theCoding, IBaseDatatype theCodeableConcept);
 
 }

@@ -16,7 +16,7 @@ import java.util.Map;
  * #%L
  * HAPI FHIR - Core Library
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,6 +48,16 @@ public interface IQuery<Y> extends IBaseQuery<IQuery<Y>>, IClientExecutable<IQue
 	 * @since 1.4
 	 */
 	IQuery<Y> count(int theCount);
+
+	/**
+	 * Specifies the <code>_offset</code> parameter, which indicates to the server the offset of the query. Use
+	 * with {@link #count(int)}.
+	 *
+	 * This parameter is not part of the FHIR standard, all servers might not implement it.
+	 *
+	 * @since 5.2
+	 */
+	IQuery<Y> offset(int theOffset);
 
 	/**
 	 * Add an "_include" specification or an "_include:recurse" specification. If you are using

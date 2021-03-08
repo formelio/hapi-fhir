@@ -4,7 +4,7 @@ package ca.uhn.fhir.parser;
  * #%L
  * HAPI FHIR - Core Library
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -705,12 +705,6 @@ public class XmlParser extends BaseParser {
 							theEventWriter.writeStartElement(prefix, se.getName().getLocalPart(), namespaceURI);
 							theEventWriter.writeNamespace(prefix, namespaceURI);
 						}
-//						for (Iterator<Attribute> iter= se.getAttributes(); iter.hasNext(); ) {
-//							Attribute next = iter.next();
-//							if ("lang".equals(next.getName().getLocalPart())) {
-//								theEventWriter.writeAttribute("", "", next.getName().getLocalPart(), next.getValue());
-//							}
-//						}
 						firstElement = false;
 					} else {
 						if (isBlank(se.getName().getPrefix())) {
@@ -730,7 +724,11 @@ public class XmlParser extends BaseParser {
 					}
 					for (Iterator<?> attrIter = se.getAttributes(); attrIter.hasNext(); ) {
 						Attribute next = (Attribute) attrIter.next();
-						theEventWriter.writeAttribute(next.getName().getLocalPart(), next.getValue());
+						if (isBlank(next.getName().getNamespaceURI())) {
+							theEventWriter.writeAttribute(next.getName().getLocalPart(), next.getValue());
+						} else {
+							theEventWriter.writeAttribute(next.getName().getPrefix(), next.getName().getNamespaceURI(), next.getName().getLocalPart(), next.getValue());
+						}
 					}
 					break;
 				case XMLStreamConstants.DTD:

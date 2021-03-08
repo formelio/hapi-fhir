@@ -2,9 +2,9 @@ package ca.uhn.fhir.jpa.model.entity;
 
 /*
  * #%L
- * HAPI FHIR Model
+ * HAPI FHIR JPA Model
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
-import org.hibernate.search.annotations.Field;
+import org.hibernate.search.mapper.pojo.mapping.definition.annotation.FullTextField;
 
 import javax.persistence.Column;
 import javax.persistence.Embeddable;
@@ -51,10 +51,10 @@ public class ResourceIndexedSearchParamCoords extends BaseResourceIndexedSearchP
 
 	private static final long serialVersionUID = 1L;
 	@Column(name = "SP_LATITUDE")
-	@Field
+	//@FullTextField
 	public double myLatitude;
 	@Column(name = "SP_LONGITUDE")
-	@Field
+	//@FullTextField
 	public double myLongitude;
 	@Id
 	@SequenceGenerator(name = "SEQ_SPIDX_COORDS", sequenceName = "SEQ_SPIDX_COORDS")
@@ -169,8 +169,12 @@ public class ResourceIndexedSearchParamCoords extends BaseResourceIndexedSearchP
 		ToStringBuilder b = new ToStringBuilder(this, ToStringStyle.SHORT_PREFIX_STYLE);
 		b.append("paramName", getParamName());
 		b.append("resourceId", getResourcePid());
-		b.append("lat", getLatitude());
-		b.append("lon", getLongitude());
+		if (isMissing()) {
+			b.append("missing", isMissing());
+		} else {
+			b.append("lat", getLatitude());
+			b.append("lon", getLongitude());
+		}
 		return b.build();
 	}
 

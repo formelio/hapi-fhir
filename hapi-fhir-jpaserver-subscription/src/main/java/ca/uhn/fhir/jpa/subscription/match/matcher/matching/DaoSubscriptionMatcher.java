@@ -4,7 +4,7 @@ package ca.uhn.fhir.jpa.subscription.match.matcher.matching;
  * #%L
  * HAPI FHIR Subscription Server
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,11 +37,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 
 public class DaoSubscriptionMatcher implements ISubscriptionMatcher {
+	private Logger ourLog = LoggerFactory.getLogger(DaoSubscriptionMatcher.class);
+
 	@Autowired
 	DaoRegistry myDaoRegistry;
+
 	@Autowired
 	MatchUrlService myMatchUrlService;
-	private Logger ourLog = LoggerFactory.getLogger(DaoSubscriptionMatcher.class);
+
 	@Autowired
 	private FhirContext myCtx;
 

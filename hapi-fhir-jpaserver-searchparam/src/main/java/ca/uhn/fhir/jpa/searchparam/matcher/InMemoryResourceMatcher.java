@@ -3,6 +3,7 @@ package ca.uhn.fhir.jpa.searchparam.matcher;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import javax.annotation.Nonnull;
 import org.hl7.fhir.dstu3.model.Location;
 import org.hl7.fhir.instance.model.api.IAnyResource;
 import org.hl7.fhir.instance.model.api.IBaseResource;
@@ -13,7 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
  * #%L
  * HAPI FHIR Search Parameters
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -83,17 +84,42 @@ public class InMemoryResourceMatcher {
 			return InMemoryMatchResult.unsupportedFromReason(InMemoryMatchResult.PARSE_FAIL);
 		}
 		searchParameterMap.clean();
-		if (searchParameterMap.getLastUpdated() != null) {
+		return match(searchParameterMap, theResource, resourceDefinition, theSearchParams);
+	}
+
+	/**
+	 *
+	 * @param theCriteria
+	 * @return result.supported() will be true if theCriteria can be evaluated in-memory
+	 */
+	public InMemoryMatchResult canBeEvaluatedInMemory(String theCriteria) {
+		return match(theCriteria, null, null);
+	}
+
+	/**
+	 *
+	 * @param theSearchParameterMap
+	 * @param theResourceDefinition
+	 * @return result.supported() will be true if theSearchParameterMap can be evaluated in-memory
+	 */
+	public InMemoryMatchResult canBeEvaluatedInMemory(SearchParameterMap theSearchParameterMap, RuntimeResourceDefinition theResourceDefinition) {
+		return match(theSearchParameterMap, null, theResourceDefinition, null);
+	}
+
+
+	@Nonnull
+	public InMemoryMatchResult match(SearchParameterMap theSearchParameterMap, IBaseResource theResource, RuntimeResourceDefinition theResourceDefinition, ResourceIndexedSearchParams theSearchParams) {
+		if (theSearchParameterMap.getLastUpdated() != null) {
 			return InMemoryMatchResult.unsupportedFromParameterAndReason(Constants.PARAM_LASTUPDATED, InMemoryMatchResult.STANDARD_PARAMETER);
 		}
-		if (searchParameterMap.containsKey(Location.SP_NEAR)) {
+		if (theSearchParameterMap.containsKey(Location.SP_NEAR)) {
 			return InMemoryMatchResult.unsupportedFromReason(InMemoryMatchResult.LOCATION_NEAR);
 		}
 
-		for (Map.Entry<String, List<List<IQueryParameterType>>> entry : searchParameterMap.entrySet()) {
+		for (Map.Entry<String, List<List<IQueryParameterType>>> entry : theSearchParameterMap.entrySet()) {
 			String theParamName = entry.getKey();
 			List<List<IQueryParameterType>> theAndOrParams = entry.getValue();
-			InMemoryMatchResult result = matchIdsWithAndOr(theParamName, theAndOrParams, resourceDefinition, theResource, theSearchParams);
+			InMemoryMatchResult result = matchIdsWithAndOr(theParamName, theAndOrParams, theResourceDefinition, theResource, theSearchParams);
 			if (!result.matched()) {
 				return result;
 			}
@@ -199,7 +225,7 @@ public class InMemoryResourceMatcher {
 					if (theSearchParams == null) {
 						return InMemoryMatchResult.successfulMatch();
 					} else {
-						return InMemoryMatchResult.fromBoolean(theAndOrParams.stream().allMatch(nextAnd -> matchParams(theModelConfig, theResourceName, theParamName, theParamDef, nextAnd, theSearchParams, myModelConfig.getUseOrdinalDatesForDayPrecisionSearches())));
+						return InMemoryMatchResult.fromBoolean(theAndOrParams.stream().allMatch(nextAnd -> matchParams(theModelConfig, theResourceName, theParamName, theParamDef, nextAnd, theSearchParams)));
 					}
 				case COMPOSITE:
 				case HAS:
@@ -216,8 +242,8 @@ public class InMemoryResourceMatcher {
 		}
 	}
 
-	private boolean matchParams(ModelConfig theModelConfig, String theResourceName, String theParamName, RuntimeSearchParam paramDef, List<? extends IQueryParameterType> theNextAnd, ResourceIndexedSearchParams theSearchParams,boolean theUseOrdinalDatesForDayComparison) {
-		return theNextAnd.stream().anyMatch(token -> theSearchParams.matchParam(theModelConfig, theResourceName, theParamName, paramDef, token, theUseOrdinalDatesForDayComparison));
+	private boolean matchParams(ModelConfig theModelConfig, String theResourceName, String theParamName, RuntimeSearchParam paramDef, List<? extends IQueryParameterType> theNextAnd, ResourceIndexedSearchParams theSearchParams) {
+		return theNextAnd.stream().anyMatch(token -> theSearchParams.matchParam(theModelConfig, theResourceName, theParamName, paramDef, token));
 	}
 
 	private boolean hasChain(List<List<IQueryParameterType>> theAndOrParams) {

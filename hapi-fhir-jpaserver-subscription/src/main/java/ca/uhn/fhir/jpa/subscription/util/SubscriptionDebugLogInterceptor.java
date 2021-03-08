@@ -4,7 +4,7 @@ package ca.uhn.fhir.jpa.subscription.util;
  * #%L
  * HAPI FHIR Subscription Server
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,8 +25,8 @@ import ca.uhn.fhir.interceptor.api.Interceptor;
 import ca.uhn.fhir.interceptor.api.Pointcut;
 import ca.uhn.fhir.jpa.searchparam.matcher.InMemoryMatchResult;
 import ca.uhn.fhir.jpa.subscription.model.CanonicalSubscriptionChannelType;
-import ca.uhn.fhir.jpa.subscription.model.ResourceModifiedMessage;
 import ca.uhn.fhir.jpa.subscription.model.ResourceDeliveryMessage;
+import ca.uhn.fhir.jpa.subscription.model.ResourceModifiedMessage;
 import ca.uhn.fhir.util.StopWatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -4,7 +4,7 @@ package ca.uhn.fhir.test.utilities.server;
  * #%L
  * HAPI FHIR Test Utilities
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -73,16 +73,9 @@ public class RestfulServerExtension implements BeforeEachCallback, AfterEachCall
 
 	private void createContextIfNeeded() {
 		if (myFhirVersion != null) {
-			myFhirContext = new FhirContext(myFhirVersion);
+			myFhirContext = FhirContext.forCached(myFhirVersion);
 		}
 	}
-
-	private void destroyContextIfWeCreatedIt() {
-		if (myFhirVersion != null) {
-			myFhirContext = null;
-		}
-	}
-
 
 	private void stopServer() throws Exception {
 		JettyUtil.closeServer(myServer);
@@ -125,6 +118,7 @@ public class RestfulServerExtension implements BeforeEachCallback, AfterEachCall
 	}
 
 	public FhirContext getFhirContext() {
+		createContextIfNeeded();
 		return myFhirContext;
 	}
 
@@ -139,7 +133,6 @@ public class RestfulServerExtension implements BeforeEachCallback, AfterEachCall
 	@Override
 	public void afterEach(ExtensionContext context) throws Exception {
 		stopServer();
-		destroyContextIfWeCreatedIt();
 	}
 
 	@Override

@@ -4,7 +4,7 @@ package ca.uhn.fhir.jpa.searchparam.extractor;
  * #%L
  * HAPI FHIR Search Parameters
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,10 +31,12 @@ import ca.uhn.fhir.jpa.model.config.PartitionSettings;
 import ca.uhn.fhir.jpa.model.cross.IResourceLookup;
 import ca.uhn.fhir.jpa.model.entity.BaseResourceIndexedSearchParam;
 import ca.uhn.fhir.jpa.model.entity.ModelConfig;
+import ca.uhn.fhir.jpa.model.entity.NormalizedQuantitySearchLevel;
 import ca.uhn.fhir.jpa.model.entity.ResourceIndexedSearchParamCoords;
 import ca.uhn.fhir.jpa.model.entity.ResourceIndexedSearchParamDate;
 import ca.uhn.fhir.jpa.model.entity.ResourceIndexedSearchParamNumber;
 import ca.uhn.fhir.jpa.model.entity.ResourceIndexedSearchParamQuantity;
+import ca.uhn.fhir.jpa.model.entity.ResourceIndexedSearchParamQuantityNormalized;
 import ca.uhn.fhir.jpa.model.entity.ResourceIndexedSearchParamString;
 import ca.uhn.fhir.jpa.model.entity.ResourceIndexedSearchParamToken;
 import ca.uhn.fhir.jpa.model.entity.ResourceIndexedSearchParamUri;
@@ -103,7 +105,7 @@ public class SearchParamExtractorService {
 	}
 
 	private void extractSearchIndexParameters(RequestDetails theRequestDetails, ResourceIndexedSearchParams theParams, IBaseResource theResource, ResourceTable theEntity) {
-
+		
 		// Strings
 		ISearchParamExtractor.SearchParamSet<ResourceIndexedSearchParamString> strings = extractSearchParamStrings(theResource);
 		handleWarnings(theRequestDetails, myInterceptorBroadcaster, strings);
@@ -119,6 +121,12 @@ public class SearchParamExtractorService {
 		handleWarnings(theRequestDetails, myInterceptorBroadcaster, quantities);
 		theParams.myQuantityParams.addAll(quantities);
 
+		if (myModelConfig.getNormalizedQuantitySearchLevel().equals(NormalizedQuantitySearchLevel.NORMALIZED_QUANTITY_STORAGE_SUPPORTED) || myModelConfig.getNormalizedQuantitySearchLevel().equals(NormalizedQuantitySearchLevel.NORMALIZED_QUANTITY_SEARCH_SUPPORTED)) {
+			ISearchParamExtractor.SearchParamSet<ResourceIndexedSearchParamQuantityNormalized> quantitiesNormalized = extractSearchParamQuantityNormalized(theResource);
+			handleWarnings(theRequestDetails, myInterceptorBroadcaster, quantitiesNormalized);
+			theParams.myQuantityNormalizedParams.addAll(quantitiesNormalized);
+		}
+		
 		// Dates
 		ISearchParamExtractor.SearchParamSet<ResourceIndexedSearchParamDate> dates = extractSearchParamDates(theResource);
 		handleWarnings(theRequestDetails, myInterceptorBroadcaster, dates);
@@ -151,6 +159,7 @@ public class SearchParamExtractorService {
 		// Do this after, because we add to strings during both string and token processing
 		populateResourceTable(theParams.myNumberParams, theEntity);
 		populateResourceTable(theParams.myQuantityParams, theEntity);
+		populateResourceTable(theParams.myQuantityNormalizedParams, theEntity);
 		populateResourceTable(theParams.myDateParams, theEntity);
 		populateResourceTable(theParams.myUriParams, theEntity);
 		populateResourceTable(theParams.myTokenParams, theEntity);
@@ -259,8 +268,8 @@ public class SearchParamExtractorService {
 		}
 
 		Class<? extends IBaseResource> type = resourceDefinition.getImplementingClass();
-		String id = nextId.getIdPart();
-		if (StringUtils.isBlank(id)) {
+		String targetId = nextId.getIdPart();
+		if (StringUtils.isBlank(targetId)) {
 			String msg = "Invalid resource reference found at path[" + path + "] - Does not contain resource ID - " + nextId.getValue();
 			if (theFailOnInvalidReference) {
 				throw new InvalidRequestException(msg);
@@ -270,9 +279,11 @@ public class SearchParamExtractorService {
 			}
 		}
 
-		ResourcePersistentId resolvedTargetId = theTransactionDetails.getResolvedResourceIds().get(thePathAndRef.getRef().getReferenceElement());
+		IIdType referenceElement = thePathAndRef.getRef().getReferenceElement();
+		ResourcePersistentId resolvedTargetId = theTransactionDetails.getResolvedResourceId(referenceElement);
 		ResourceLink resourceLink;
 
+		Long targetVersionId = nextId.getVersionIdPartAsLong();
 		if (resolvedTargetId != null) {
 
 			/*
@@ -280,7 +291,7 @@ public class SearchParamExtractorService {
 			 * need to resolve it again
 			 */
 			myResourceLinkResolver.validateTypeOrThrowException(type);
-			resourceLink = ResourceLink.forLocalReference(thePathAndRef.getPath(), theEntity, typeString, resolvedTargetId.getIdAsLong(), nextId.getIdPart(), transactionDate);
+			resourceLink = ResourceLink.forLocalReference(thePathAndRef.getPath(), theEntity, typeString, resolvedTargetId.getIdAsLong(), targetId, transactionDate, targetVersionId);
 
 		} else if (theFailOnInvalidReference) {
 
@@ -296,7 +307,7 @@ public class SearchParamExtractorService {
 			} else {
 				// Cache the outcome in the current transaction in case there are more references
 				ResourcePersistentId persistentId = new ResourcePersistentId(resourceLink.getTargetResourcePid());
-				theTransactionDetails.addResolvedResourceId(thePathAndRef.getRef().getReferenceElement(), persistentId);
+				theTransactionDetails.addResolvedResourceId(referenceElement, persistentId);
 			}
 
 		} else {
@@ -308,7 +319,7 @@ public class SearchParamExtractorService {
 			ResourceTable target;
 			target = new ResourceTable();
 			target.setResourceType(typeString);
-			resourceLink = ResourceLink.forLocalReference(thePathAndRef.getPath(), theEntity, typeString, null, nextId.getIdPart(), transactionDate);
+			resourceLink = ResourceLink.forLocalReference(thePathAndRef.getPath(), theEntity, typeString, null, targetId, transactionDate, targetVersionId);
 
 		}
 
@@ -337,7 +348,8 @@ public class SearchParamExtractorService {
 		String targetResourceType = targetResource.getResourceType();
 		Long targetResourcePid = targetResource.getResourceId();
 		String targetResourceIdPart = theNextId.getIdPart();
-		return ResourceLink.forLocalReference(nextPathAndRef.getPath(), theEntity, targetResourceType, targetResourcePid, targetResourceIdPart, theUpdateTime);
+		Long targetVersion = theNextId.getVersionIdPartAsLong();
+		return ResourceLink.forLocalReference(nextPathAndRef.getPath(), theEntity, targetResourceType, targetResourcePid, targetResourceIdPart, theUpdateTime, targetVersion);
 	}
 
 
@@ -376,6 +388,10 @@ public class SearchParamExtractorService {
 
 	private ISearchParamExtractor.SearchParamSet<ResourceIndexedSearchParamQuantity> extractSearchParamQuantity(IBaseResource theResource) {
 		return mySearchParamExtractor.extractSearchParamQuantity(theResource);
+	}
+
+	private ISearchParamExtractor.SearchParamSet<ResourceIndexedSearchParamQuantityNormalized> extractSearchParamQuantityNormalized(IBaseResource theResource) {
+		return mySearchParamExtractor.extractSearchParamQuantityNormalized(theResource);
 	}
 
 	private ISearchParamExtractor.SearchParamSet<ResourceIndexedSearchParamString> extractSearchParamStrings(IBaseResource theResource) {

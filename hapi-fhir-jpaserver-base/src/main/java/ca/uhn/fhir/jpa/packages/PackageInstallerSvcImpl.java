@@ -4,7 +4,7 @@ package ca.uhn.fhir.jpa.packages;
  * #%L
  * HAPI FHIR JPA Server
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,15 +20,23 @@ package ca.uhn.fhir.jpa.packages;
  * #L%
  */
 
+import ca.uhn.fhir.context.BaseRuntimeChildDefinition;
+import ca.uhn.fhir.context.BaseRuntimeElementCompositeDefinition;
+import ca.uhn.fhir.context.BaseRuntimeElementDefinition;
 import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.context.FhirVersionEnum;
 import ca.uhn.fhir.context.support.IValidationSupport;
 import ca.uhn.fhir.context.support.ValidationSupportContext;
 import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
 import ca.uhn.fhir.jpa.api.dao.IFhirResourceDao;
+import ca.uhn.fhir.jpa.api.model.DaoMethodOutcome;
 import ca.uhn.fhir.jpa.dao.data.INpmPackageVersionDao;
+import ca.uhn.fhir.jpa.model.config.PartitionSettings;
 import ca.uhn.fhir.jpa.model.entity.NpmPackageVersionEntity;
+import ca.uhn.fhir.jpa.model.util.JpaConstants;
+import ca.uhn.fhir.jpa.partition.SystemRequestDetails;
 import ca.uhn.fhir.jpa.searchparam.SearchParameterMap;
+import ca.uhn.fhir.jpa.searchparam.registry.ISearchParamRegistry;
 import ca.uhn.fhir.rest.api.server.IBundleProvider;
 import ca.uhn.fhir.rest.param.StringParam;
 import ca.uhn.fhir.rest.param.TokenParam;
@@ -44,13 +52,14 @@ import org.apache.commons.lang3.Validate;
 import org.hl7.fhir.instance.model.api.IBase;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.instance.model.api.IPrimitiveType;
-import org.hl7.fhir.utilities.cache.IPackageCacheManager;
-import org.hl7.fhir.utilities.cache.NpmPackage;
+import org.hl7.fhir.r4.model.Identifier;
+import org.hl7.fhir.utilities.npm.IPackageCacheManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.hl7.fhir.utilities.npm.NpmPackage;
 
 import javax.annotation.PostConstruct;
 import java.io.IOException;
@@ -94,7 +103,10 @@ public class PackageInstallerSvcImpl implements IPackageInstallerSvc {
 	private PlatformTransactionManager myTxManager;
 	@Autowired
 	private INpmPackageVersionDao myPackageVersionDao;
-
+	@Autowired
+	private ISearchParamRegistry mySearchParamRegistry;
+	@Autowired
+	private PartitionSettings myPartitionSettings;
 	/**
 	 * Constructor
 	 */
@@ -161,6 +173,9 @@ public class PackageInstallerSvcImpl implements IPackageInstallerSvc {
 
 				if (theInstallationSpec.getInstallMode() == PackageInstallationSpec.InstallModeEnum.STORE_AND_INSTALL) {
 					install(npmPackage, theInstallationSpec, retVal);
+
+					// If any SearchParameters were installed, let's load them right away
+					mySearchParamRegistry.refreshCacheIfNecessary();
 				}
 
 			} catch (IOException e) {
@@ -201,6 +216,7 @@ public class PackageInstallerSvcImpl implements IPackageInstallerSvc {
 			count[i] = resources.size();
 
 			for (IBaseResource next : resources) {
+
 				try {
 					next = isStructureDefinitionWithoutSnapshot(next) ? generateSnapshot(next) : next;
 					create(next, theOutcome);
@@ -208,6 +224,7 @@ public class PackageInstallerSvcImpl implements IPackageInstallerSvc {
 					ourLog.warn("Failed to upload resource of type {} with ID {} - Error: {}", myFhirContext.getResourceType(next), next.getIdElement().getValue(), e.toString());
 					throw new ImplementationGuideInstallationException(String.format("Error installing IG %s#%s: %s", name, version, e.toString()), e);
 				}
+
 			}
 
 		}
@@ -303,14 +320,54 @@ public class PackageInstallerSvcImpl implements IPackageInstallerSvc {
 	private void create(IBaseResource theResource, PackageInstallOutcomeJson theOutcome) {
 		IFhirResourceDao dao = myDaoRegistry.getResourceDao(theResource.getClass());
 		SearchParameterMap map = createSearchParameterMapFor(theResource);
-		IBundleProvider searchResult = dao.search(map);
-		if (searchResult.isEmpty()) {
+		IBundleProvider searchResult = searchResource(dao, map);
+		if (validForUpload(theResource)) {
+			if (searchResult.isEmpty()) {
 
-			if (validForUpload(theResource)) {
+				ourLog.info("Creating new resource matching {}", map.toNormalizedQueryString(myFhirContext));
 				theOutcome.incrementResourcesInstalled(myFhirContext.getResourceType(theResource));
-				dao.create(theResource);
+				createResource(dao, theResource);
+
+			} else {
+
+				ourLog.info("Updating existing resource matching {}", map.toNormalizedQueryString(myFhirContext));
+				theResource.setId(searchResult.getResources(0, 1).get(0).getIdElement().toUnqualifiedVersionless());
+				DaoMethodOutcome outcome = updateResource(dao, theResource);
+				if (!outcome.isNop()) {
+					theOutcome.incrementResourcesInstalled(myFhirContext.getResourceType(theResource));
+				}
 			}
 
+		}
+	}
+
+	private IBundleProvider searchResource(IFhirResourceDao theDao, SearchParameterMap theMap) {
+		if (myPartitionSettings.isPartitioningEnabled()) {
+			SystemRequestDetails requestDetails = new SystemRequestDetails();
+			requestDetails.setTenantId(JpaConstants.DEFAULT_PARTITION_NAME);
+			return theDao.search(theMap, requestDetails);
+		} else {
+			return theDao.search(theMap);
+		}
+	}
+
+	private void createResource(IFhirResourceDao theDao, IBaseResource theResource) {
+		if (myPartitionSettings.isPartitioningEnabled()) {
+			SystemRequestDetails requestDetails = new SystemRequestDetails();
+			requestDetails.setTenantId(JpaConstants.DEFAULT_PARTITION_NAME);
+			theDao.create(theResource, requestDetails);
+		} else {
+			theDao.create(theResource);
+		}
+	}
+
+	private DaoMethodOutcome updateResource(IFhirResourceDao theDao, IBaseResource theResource) {
+		if (myPartitionSettings.isPartitioningEnabled()) {
+			SystemRequestDetails requestDetails = new SystemRequestDetails();
+			requestDetails.setTenantId(JpaConstants.DEFAULT_PARTITION_NAME);
+			return theDao.update(theResource, requestDetails);
+		} else {
+			return theDao.update(theResource);
 		}
 	}
 
@@ -329,6 +386,13 @@ public class PackageInstallerSvcImpl implements IPackageInstallerSvc {
 			}
 
 			if (SearchParameterUtil.getBaseAsStrings(myFhirContext, theResource).isEmpty()) {
+				return false;
+			}
+		}
+
+		List<IPrimitiveType> statusTypes = myFhirContext.newFhirPath().evaluate(theResource, "status", IPrimitiveType.class);
+		if (statusTypes.size() > 0) {
+			if (!statusTypes.get(0).getValueAsString().equals("active")) {
 				return false;
 			}
 		}
@@ -358,9 +422,12 @@ public class PackageInstallerSvcImpl implements IPackageInstallerSvc {
 		} else if (resource.getClass().getSimpleName().equals("Subscription")) {
 			String id = extractIdFromSubscription(resource);
 			return SearchParameterMap.newSynchronous().add("_id", new TokenParam(id));
-		} else {
+		} else if (resourceHasUrlElement(resource)) {
 			String url = extractUniqueUrlFromMetadataResource(resource);
 			return SearchParameterMap.newSynchronous().add("url", new UriParam(url));
+		} else {
+			TokenParam identifierToken = extractIdentifierFromOtherResourceTypes(resource);
+			return SearchParameterMap.newSynchronous().add("identifier", identifierToken);
 		}
 	}
 
@@ -384,6 +451,26 @@ public class PackageInstallerSvcImpl implements IPackageInstallerSvc {
 		FhirTerser terser = myFhirContext.newTerser();
 		IPrimitiveType<?> asPrimitiveType = (IPrimitiveType<?>) terser.getSingleValueOrNull(resource, "url");
 		return (String) asPrimitiveType.getValue();
+	}
+
+	private TokenParam extractIdentifierFromOtherResourceTypes(IBaseResource resource) {
+		FhirTerser terser = myFhirContext.newTerser();
+		Identifier identifier = (Identifier) terser.getSingleValueOrNull(resource, "identifier");
+		if (identifier != null) {
+			return new TokenParam(identifier.getSystem(), identifier.getValue());
+		} else {
+			throw new UnsupportedOperationException("Resources in a package must have a url or identifier to be loaded by the package installer.");
+		}
+	}
+
+	private boolean resourceHasUrlElement(IBaseResource resource) {
+		BaseRuntimeElementDefinition<?> def = myFhirContext.getElementDefinition(resource.getClass());
+		if (!(def instanceof BaseRuntimeElementCompositeDefinition)) {
+			throw new IllegalArgumentException("Resource is not a composite type: " + resource.getClass().getName());
+		}
+		BaseRuntimeElementCompositeDefinition<?> currentDef = (BaseRuntimeElementCompositeDefinition<?>) def;
+		BaseRuntimeChildDefinition nextDef = currentDef.getChildByName("url");
+		return nextDef != null;
 	}
 
 	@VisibleForTesting

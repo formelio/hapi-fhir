@@ -1,7 +1,6 @@
 package ca.uhn.fhir.jpa.dao.dstu3;
 
 import ca.uhn.fhir.jpa.term.TermReindexingSvcImpl;
-import ca.uhn.fhir.util.TestUtil;
 import org.apache.commons.io.IOUtils;
 import org.hl7.fhir.dstu3.model.CodeSystem;
 import org.hl7.fhir.dstu3.model.Enumerations;
@@ -13,6 +12,8 @@ import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.fail;
 
 public class FhirResourceDaoDstu3CodeSystemTest extends BaseJpaDstu3Test {
 	@AfterAll
@@ -62,8 +63,22 @@ public class FhirResourceDaoDstu3CodeSystemTest extends BaseJpaDstu3Test {
 		cs.addConcept().setCode("A");
 		cs.addConcept().setCode("B");
 		myCodeSystemDao.update(cs, mySrd);
+		myTerminologyDeferredStorageSvc.saveAllDeferred();
 		runInTransaction(()->{
 			assertEquals(2, myConceptDao.count());
+		});
+
+		// Update the code system to reduce the count again
+		cs = new CodeSystem();
+		cs.setId(id);
+		cs.setUrl("http://foo");
+		cs.setContent(CodeSystem.CodeSystemContentMode.COMPLETE);
+		cs.setStatus(Enumerations.PublicationStatus.ACTIVE);
+		cs.addConcept().setCode("C");
+		myCodeSystemDao.update(cs, mySrd);
+		myTerminologyDeferredStorageSvc.saveAllDeferred();
+		runInTransaction(()->{
+			assertEquals(1, myConceptDao.count());
 		});
 
 		// Delete the code system
@@ -76,6 +91,18 @@ public class FhirResourceDaoDstu3CodeSystemTest extends BaseJpaDstu3Test {
 		});
 
 	}
+
+	@Test
+	public void testValidateCodeForCodeSystemOperationNotSupported() {
+		try {
+			myCodeSystemDao.validateCode(null, null, null, null, null, null, null, null);
+			fail();
+		} catch (UnsupportedOperationException theE) {
+			assertNotNull(theE);
+		}
+
+	}
+
 
 
 }

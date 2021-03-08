@@ -30,7 +30,7 @@ import ca.uhn.fhir.rest.server.exceptions.ResourceGoneException;
 import ca.uhn.fhir.rest.server.exceptions.ResourceNotFoundException;
 import ca.uhn.fhir.rest.server.exceptions.ResourceVersionConflictException;
 import ca.uhn.fhir.rest.server.exceptions.UnprocessableEntityException;
-import ca.uhn.fhir.util.TestUtil;
+
 import com.google.common.collect.Lists;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -81,7 +81,6 @@ import org.hl7.fhir.instance.model.api.IAnyResource;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.instance.model.api.IIdType;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
@@ -527,7 +526,7 @@ public class FhirResourceDaoDstu3Test extends BaseJpaDstu3Test {
 			myBundleDao.create(bundle, mySrd);
 			fail();
 		} catch (UnprocessableEntityException e) {
-			assertEquals("Unable to store a Bundle resource on this server with a Bundle.type value of: (missing)", e.getMessage());
+			assertEquals("Unable to store a Bundle resource on this server with a Bundle.type value of: (missing). Note that if you are trying to perform a FHIR transaction or batch operation you should POST the Bundle resource to the Base URL of the server, not to the /Bundle endpoint.", e.getMessage());
 		}
 
 		bundle = new Bundle();
@@ -537,7 +536,7 @@ public class FhirResourceDaoDstu3Test extends BaseJpaDstu3Test {
 			myBundleDao.create(bundle, mySrd);
 			fail();
 		} catch (UnprocessableEntityException e) {
-			assertEquals("Unable to store a Bundle resource on this server with a Bundle.type value of: searchset", e.getMessage());
+			assertEquals("Unable to store a Bundle resource on this server with a Bundle.type value of: searchset. Note that if you are trying to perform a FHIR transaction or batch operation you should POST the Bundle resource to the Base URL of the server, not to the /Bundle endpoint.", e.getMessage());
 		}
 
 		bundle = new Bundle();
@@ -2025,7 +2024,7 @@ public class FhirResourceDaoDstu3Test extends BaseJpaDstu3Test {
 			found = toList(myPatientDao.search(new SearchParameterMap(Patient.SP_BIRTHDATE + "AAAA", new DateParam(ParamPrefixEnum.GREATERTHAN, "2000-01-01")).setLoadSynchronous(true)));
 			assertEquals(0, found.size());
 		} catch (InvalidRequestException e) {
-			assertEquals("Unknown search parameter \"birthdateAAAA\" for resource type \"Patient\". Valid search parameters for this search are: [_id, _language, active, address, address-city, address-country, address-postalcode, address-state, address-use, animal-breed, animal-species, birthdate, death-date, deceased, email, family, gender, general-practitioner, given, identifier, language, link, name, organization, phone, phonetic, telecom]", e.getMessage());
+			assertEquals("Unknown search parameter \"birthdateAAAA\" for resource type \"Patient\". Valid search parameters for this search are: [_id, _language, _lastUpdated, active, address, address-city, address-country, address-postalcode, address-state, address-use, animal-breed, animal-species, birthdate, death-date, deceased, email, family, gender, general-practitioner, given, identifier, language, link, name, organization, phone, phonetic, telecom]", e.getMessage());
 		}
 	}
 
@@ -2553,18 +2552,78 @@ public class FhirResourceDaoDstu3Test extends BaseJpaDstu3Test {
 
 	@Test()
 	public void testSortByComposite() {
-		Observation o = new Observation();
-		o.getCode().setText("testSortByComposite");
-		myObservationDao.create(o, mySrd);
+		
+		IIdType pid0;
+		IIdType oid1;
+		IIdType oid2;
+		IIdType oid3;
+		IIdType oid4;
+		{
+			Patient patient = new Patient();
+			patient.addIdentifier().setSystem("urn:system").setValue("001");
+			patient.addName().setFamily("Tester").addGiven("Joe");
+			pid0 = myPatientDao.create(patient, mySrd).getId().toUnqualifiedVersionless();
+		}
+		{
+			Observation obs = new Observation();
+			obs.addIdentifier().setSystem("urn:system").setValue("FOO");
+			obs.getSubject().setReferenceElement(pid0);
+			obs.getCode().addCoding().setCode("2345-7").setSystem("http://loinc.org");
+			obs.setValue(new StringType("200"));
+			
+			oid1 = myObservationDao.create(obs, mySrd).getId().toUnqualifiedVersionless();
+			
+			ourLog.info("Observation: \n" + myFhirCtx.newJsonParser().setPrettyPrint(true).encodeResourceToString(obs));
+		}
+		
+		{
+			Observation obs = new Observation();
+			obs.addIdentifier().setSystem("urn:system").setValue("FOO");
+			obs.getSubject().setReferenceElement(pid0);
+			obs.getCode().addCoding().setCode("2345-7").setSystem("http://loinc.org");
+			obs.setValue(new StringType("300"));
+			
+			oid2 = myObservationDao.create(obs, mySrd).getId().toUnqualifiedVersionless();
+			
+			ourLog.info("Observation: \n" + myFhirCtx.newJsonParser().setPrettyPrint(true).encodeResourceToString(obs));
+		}
+		
+		{
+			Observation obs = new Observation();
+			obs.addIdentifier().setSystem("urn:system").setValue("FOO");
+			obs.getSubject().setReferenceElement(pid0);
+			obs.getCode().addCoding().setCode("2345-7").setSystem("http://loinc.org");
+			obs.setValue(new StringType("150"));
+			
+			oid3 = myObservationDao.create(obs, mySrd).getId().toUnqualifiedVersionless();
+			
+			ourLog.info("Observation: \n" + myFhirCtx.newJsonParser().setPrettyPrint(true).encodeResourceToString(obs));
+		}
+		
+		{
+			Observation obs = new Observation();
+			obs.addIdentifier().setSystem("urn:system").setValue("FOO");
+			obs.getSubject().setReferenceElement(pid0);
+			obs.getCode().addCoding().setCode("2345-7").setSystem("http://loinc.org");
+			obs.setValue(new StringType("250"));
+			
+			oid4 = myObservationDao.create(obs, mySrd).getId().toUnqualifiedVersionless();
+			
+			ourLog.info("Observation: \n" + myFhirCtx.newJsonParser().setPrettyPrint(true).encodeResourceToString(obs));
+		}
+
 
 		SearchParameterMap pm = new SearchParameterMap();
-		pm.setSort(new SortSpec(Observation.SP_CODE_VALUE_CONCEPT));
-		try {
-			myObservationDao.search(pm).size();
-			fail();
-		} catch (InvalidRequestException e) {
-			assertEquals("This server does not support _sort specifications of type COMPOSITE - Can't serve _sort=code-value-concept", e.getMessage());
-		}
+		pm.setSort(new SortSpec(Observation.SP_CODE_VALUE_STRING));
+		
+		IBundleProvider found = myObservationDao.search(pm);
+		
+		List<IIdType> list = toUnqualifiedVersionlessIds(found);
+		assertEquals(4, list.size());
+		assertEquals(oid3, list.get(0));
+		assertEquals(oid1, list.get(1));
+		assertEquals(oid4, list.get(2));
+		assertEquals(oid2, list.get(3));
 	}
 
 	@Test
@@ -2600,14 +2659,14 @@ public class FhirResourceDaoDstu3Test extends BaseJpaDstu3Test {
 		pm.setSort(new SortSpec(Patient.SP_BIRTHDATE));
 		actual = toUnqualifiedVersionlessIds(myPatientDao.search(pm));
 		assertEquals(4, actual.size());
-		assertThat(actual, contains(id4, id1, id2, id3));
+		assertThat(actual, contains(id1, id2, id3, id4));
 
 		pm = new SearchParameterMap();
 		pm.add(Patient.SP_IDENTIFIER, new TokenParam("urn:system", "testtestSortByDate"));
 		pm.setSort(new SortSpec(Patient.SP_BIRTHDATE).setOrder(SortOrderEnum.ASC));
 		actual = toUnqualifiedVersionlessIds(myPatientDao.search(pm));
 		assertEquals(4, actual.size());
-		assertThat(actual, contains(id4, id1, id2, id3));
+		assertThat(actual, contains(id1, id2, id3, id4));
 
 		pm = new SearchParameterMap();
 		pm.add(Patient.SP_IDENTIFIER, new TokenParam("urn:system", "testtestSortByDate"));
@@ -2652,21 +2711,21 @@ public class FhirResourceDaoDstu3Test extends BaseJpaDstu3Test {
 		pm.setSort(new SortSpec(IAnyResource.SP_RES_ID));
 		actual = toUnqualifiedVersionlessIds(myPatientDao.search(pm));
 		assertEquals(5, actual.size());
-		assertThat(actual.toString(), actual, contains(id1, id2, id3, id4, idMethodName));
+		assertThat(actual.toString(), actual, contains(idMethodName, id1, id2, id3, id4));
 
 		pm = new SearchParameterMap();
 		pm.add(Patient.SP_IDENTIFIER, new TokenParam("urn:system", methodName));
 		pm.setSort(new SortSpec(IAnyResource.SP_RES_ID).setOrder(SortOrderEnum.ASC));
 		actual = toUnqualifiedVersionlessIds(myPatientDao.search(pm));
 		assertEquals(5, actual.size());
-		assertThat(actual.toString(), actual, contains(id1, id2, id3, id4, idMethodName));
+		assertThat(actual.toString(), actual, contains(idMethodName, id1, id2, id3, id4));
 
 		pm = new SearchParameterMap();
 		pm.add(Patient.SP_IDENTIFIER, new TokenParam("urn:system", methodName));
 		pm.setSort(new SortSpec(IAnyResource.SP_RES_ID).setOrder(SortOrderEnum.DESC));
 		actual = toUnqualifiedVersionlessIds(myPatientDao.search(pm));
 		assertEquals(5, actual.size());
-		assertThat(actual.toString(), actual, contains(idMethodName, id4, id3, id2, id1));
+		assertThat(actual.toString(), actual, contains(id4, id3, id2, id1, idMethodName));
 	}
 
 	@Test
@@ -2891,14 +2950,14 @@ public class FhirResourceDaoDstu3Test extends BaseJpaDstu3Test {
 		pm.setSort(new SortSpec(Patient.SP_FAMILY));
 		actual = toUnqualifiedVersionlessIds(myPatientDao.search(pm));
 		assertEquals(4, actual.size());
-		assertThat(actual, contains(id4, id1, id2, id3));
+		assertThat(actual, contains(id1, id2, id3, id4));
 
 		pm = new SearchParameterMap();
 		pm.add(Patient.SP_IDENTIFIER, new TokenParam("urn:system", string));
 		pm.setSort(new SortSpec(Patient.SP_FAMILY).setOrder(SortOrderEnum.ASC));
 		actual = toUnqualifiedVersionlessIds(myPatientDao.search(pm));
 		assertEquals(4, actual.size());
-		assertThat(actual, contains(id4, id1, id2, id3));
+		assertThat(actual, contains(id1, id2, id3, id4));
 
 		pm = new SearchParameterMap();
 		pm.add(Patient.SP_IDENTIFIER, new TokenParam("urn:system", string));

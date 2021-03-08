@@ -6,16 +6,15 @@ import ca.uhn.fhir.jpa.dao.dstu3.FhirResourceDaoDstu3TerminologyTest;
 import ca.uhn.fhir.jpa.term.TermReindexingSvcImpl;
 import ca.uhn.fhir.rest.server.exceptions.InvalidRequestException;
 import ca.uhn.fhir.rest.server.exceptions.ResourceNotFoundException;
-import ca.uhn.fhir.util.TestUtil;
 import org.hl7.fhir.dstu3.model.*;
 import org.hl7.fhir.instance.model.api.IBaseOperationOutcome;
 import org.hl7.fhir.instance.model.api.IBaseResource;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -37,7 +36,11 @@ public class ResourceProviderDstu3CodeSystemTest extends BaseResourceProviderDst
 
 	@Test
 	public void testLookupOnExternalCode() {
-		ResourceProviderDstu3ValueSetTest.createExternalCs(myCodeSystemDao, myResourceTableDao, myTermCodeSystemStorageSvc, mySrd);
+		ResourceProviderDstu3ValueSetTest.createExternalCs(myCodeSystemDao, myResourceTableDao, myTermCodeSystemStorageSvc, mySrd, myCaptureQueriesListener);
+
+		runInTransaction(()->{
+			ourLog.info("Code system versions:\n * " + myTermCodeSystemVersionDao.findAll().stream().map(t->t.toString()).collect(Collectors.joining("\n * ")));
+		});
 
 		Parameters respParam = ourClient
 			.operation()
@@ -332,6 +335,19 @@ public class ResourceProviderDstu3CodeSystemTest extends BaseResourceProviderDst
 		return ourCtx.newJsonParser().parseResource(theType, loadResource(theFilename));
 	}
 
+	@Test
+	public void testValidateCodeOperation() {
+		
+		Parameters inParams = new Parameters();
+		inParams.addParameter().setName("url").setValue(new UriType("https://url"));
+		inParams.addParameter().setName("code").setValue(new CodeType("1"));
 
+		try {
+			ourClient.operation().onType(CodeSystem.class).named("validate-code").withParameters(inParams).execute();
+			fail();
+		} catch (InvalidRequestException e) {
+			assertEquals("HTTP 400 Bad Request: Invalid request: The FHIR endpoint on this server does not know how to handle POST operation[CodeSystem/$validate-code] with parameters [[]]", e.getMessage());
+		}
+	}
 
 }

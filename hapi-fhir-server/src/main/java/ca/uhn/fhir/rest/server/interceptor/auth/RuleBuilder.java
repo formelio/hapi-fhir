@@ -4,7 +4,7 @@ package ca.uhn.fhir.rest.server.interceptor.auth;
  * #%L
  * HAPI FHIR - Server Framework
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -215,7 +215,8 @@ public class RuleBuilder implements IAuthRuleBuilder {
 				if (theResource != null) {
 					RequestPartitionId partitionId = (RequestPartitionId) theResource.getUserData(Constants.RESOURCE_PARTITION_ID);
 					if (partitionId != null) {
-						if (!myTenantIds.contains(partitionId.getPartitionName())) {
+						String partitionNameOrNull = partitionId.getFirstPartitionNameOrNull();
+						if (partitionNameOrNull == null || !myTenantIds.contains(partitionNameOrNull)) {
 							return !myOutcome;
 						}
 					}
@@ -368,6 +369,7 @@ public class RuleBuilder implements IAuthRuleBuilder {
 			private final RuleOpEnum myRuleOp;
 			private RuleBuilderRuleOpClassifier myInstancesBuilder;
 			private boolean myOnCascade;
+			private boolean myOnExpunge;
 
 			RuleBuilderRuleOp(RuleOpEnum theRuleOp) {
 				myRuleOp = theRuleOp;
@@ -428,6 +430,12 @@ public class RuleBuilder implements IAuthRuleBuilder {
 				return this;
 			}
 
+			@Override
+			public IAuthRuleBuilderRuleOp onExpunge() {
+				myOnExpunge = true;
+				return this;
+			}
+
 			private class RuleBuilderRuleOpClassifier implements IAuthRuleBuilderRuleOpClassifier {
 
 				private final AppliesTypeEnum myAppliesTo;
@@ -468,6 +476,7 @@ public class RuleBuilder implements IAuthRuleBuilder {
 					myRule.setClassifierCompartmentName(myInCompartmentName);
 					myRule.setClassifierCompartmentOwners(myInCompartmentOwners);
 					myRule.setAppliesToDeleteCascade(myOnCascade);
+					myRule.setAppliesToDeleteExpunge(myOnExpunge);
 					myRules.add(myRule);
 
 					return new RuleBuilderFinished(myRule);

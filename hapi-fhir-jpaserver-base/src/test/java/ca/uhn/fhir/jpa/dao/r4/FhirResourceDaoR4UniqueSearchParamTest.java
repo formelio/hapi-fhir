@@ -21,6 +21,7 @@ import ca.uhn.fhir.rest.param.TokenAndListParam;
 import ca.uhn.fhir.rest.param.TokenParam;
 import ca.uhn.fhir.rest.server.exceptions.PreconditionFailedException;
 import ca.uhn.fhir.rest.server.exceptions.ResourceVersionConflictException;
+import ca.uhn.fhir.rest.server.exceptions.UnprocessableEntityException;
 import ca.uhn.fhir.util.HapiExtensions;
 import ca.uhn.fhir.util.TestUtil;
 import org.hl7.fhir.instance.model.api.IIdType;
@@ -230,7 +231,7 @@ public class FhirResourceDaoR4UniqueSearchParamTest extends BaseJpaR4Test {
 		sp = new SearchParameter();
 		sp.setId("SearchParameter/patient-uniq-identifier");
 		sp.setCode("patient-uniq-identifier");
-		sp.setExpression("Patient.identifier");
+		sp.setExpression("Patient");
 		sp.setType(Enumerations.SearchParamType.COMPOSITE);
 		sp.setStatus(PublicationStatus.ACTIVE);
 		sp.addBase("Patient");
@@ -363,6 +364,50 @@ public class FhirResourceDaoR4UniqueSearchParamTest extends BaseJpaR4Test {
 	}
 
 	@Test
+	public void testCreateUniqueSpWithNoComponent() {
+		SearchParameter sp = new SearchParameter();
+		sp.setId("SearchParameter/patient-uniq-identifier");
+		sp.setCode("patient-uniq-identifier");
+		sp.setExpression("Patient");
+		sp.setType(Enumerations.SearchParamType.COMPOSITE);
+		sp.setStatus(PublicationStatus.ACTIVE);
+		sp.addBase("Patient");
+		sp.addExtension()
+			.setUrl(HapiExtensions.EXT_SP_UNIQUE)
+			.setValue(new BooleanType(true));
+
+		try {
+			mySearchParameterDao.create(sp);
+			fail();
+		} catch (UnprocessableEntityException e) {
+			assertEquals("SearchParameter is marked as unique but has no components", e.getMessage());
+		}
+	}
+
+	@Test
+	public void testCreateUniqueSpWithNoComponentDefinition() {
+		SearchParameter sp = new SearchParameter();
+		sp.setId("SearchParameter/patient-uniq-identifier");
+		sp.setCode("patient-uniq-identifier");
+		sp.setExpression("Patient");
+		sp.setType(Enumerations.SearchParamType.COMPOSITE);
+		sp.setStatus(PublicationStatus.ACTIVE);
+		sp.addBase("Patient");
+		sp.addComponent()			.setExpression("Patient");
+		sp.addExtension()
+			.setUrl(HapiExtensions.EXT_SP_UNIQUE)
+			.setValue(new BooleanType(true));
+
+		try {
+			mySearchParameterDao.create(sp);
+			fail();
+		} catch (UnprocessableEntityException e) {
+			assertEquals("SearchParameter is marked as unique but is missing component.definition", e.getMessage());
+		}
+	}
+
+
+	@Test
 	public void testDoubleMatchingOnAnd_Search() {
 		createUniqueIndexPatientIdentifier();
 
@@ -397,8 +442,8 @@ public class FhirResourceDaoR4UniqueSearchParamTest extends BaseJpaR4Test {
 		myCaptureQueriesListener.logFirstSelectQueryForCurrentThread();
 		unformattedSql = myCaptureQueriesListener.getSelectQueriesForCurrentThread().get(0).getSql(true, false);
 		assertThat(unformattedSql, stringContainsInOrder(
-			"IDX_STRING='Patient?identifier=urn%7C111'",
-			"HASH_SYS_AND_VALUE in ('-3122824860083758210')"
+			"IDX_STRING = 'Patient?identifier=urn%7C111'",
+			"HASH_SYS_AND_VALUE = '-3122824860083758210'"
 		));
 		assertThat(unformattedSql, not(containsString(("RES_DELETED_AT"))));
 		assertThat(unformattedSql, not(containsString(("RES_TYPE"))));
@@ -416,7 +461,7 @@ public class FhirResourceDaoR4UniqueSearchParamTest extends BaseJpaR4Test {
 		myCaptureQueriesListener.logFirstSelectQueryForCurrentThread();
 		assertThat(toUnqualifiedVersionlessIdValues(outcome), containsInAnyOrder(id1));
 		unformattedSql = myCaptureQueriesListener.getSelectQueriesForCurrentThread().get(0).getSql(true, false);
-		assertThat(unformattedSql, containsString("HASH_SYS_AND_VALUE in ('4101160957635429999' , '-3122824860083758210')"));
+		assertThat(unformattedSql, containsString("HASH_SYS_AND_VALUE IN ('4101160957635429999','-3122824860083758210')"));
 		assertThat(unformattedSql, not(containsString(("IDX_STRING"))));
 		assertThat(unformattedSql, not(containsString(("RES_DELETED_AT"))));
 		assertThat(unformattedSql, not(containsString(("RES_TYPE"))));
@@ -534,8 +579,8 @@ public class FhirResourceDaoR4UniqueSearchParamTest extends BaseJpaR4Test {
 		assertThat(toUnqualifiedVersionlessIdValues(outcome), containsInAnyOrder(srId));
 		unformattedSql = myCaptureQueriesListener.getSelectQueriesForCurrentThread().get(0).getSql(true, false);
 		assertThat(unformattedSql, stringContainsInOrder(
-			"IDX_STRING='ServiceRequest?identifier=sys%7C111&patient=Patient%2F" + ptId.getIdPart() + "&performer=Practitioner%2F" + practId.getIdPart() + "'",
-			"HASH_SYS_AND_VALUE in ('6795110643554413877')"
+			"IDX_STRING = 'ServiceRequest?identifier=sys%7C111&patient=Patient%2F" + ptId.getIdPart() + "&performer=Practitioner%2F" + practId.getIdPart() + "'",
+			"HASH_SYS_AND_VALUE = '6795110643554413877'"
 		));
 		assertThat(unformattedSql, not(containsString(("RES_DELETED_AT"))));
 		assertThat(unformattedSql, not(containsString(("RES_TYPE"))));
@@ -556,8 +601,8 @@ public class FhirResourceDaoR4UniqueSearchParamTest extends BaseJpaR4Test {
 		assertThat(toUnqualifiedVersionlessIdValues(outcome), containsInAnyOrder(srId));
 		unformattedSql = myCaptureQueriesListener.getSelectQueriesForCurrentThread().get(0).getSql(true, false);
 		assertThat(unformattedSql, stringContainsInOrder(
-			"SRC_PATH in ('ServiceRequest.subject.where(resolve() is Patient)')",
-			"SRC_PATH in ('ServiceRequest.performer')"
+			"SRC_PATH = 'ServiceRequest.subject.where(resolve() is Patient)'",
+			"SRC_PATH = 'ServiceRequest.performer'"
 		));
 		assertThat(unformattedSql, not(containsString(("RES_DELETED_AT"))));
 		assertThat(unformattedSql, not(containsString(("RES_TYPE"))));
@@ -758,7 +803,7 @@ public class FhirResourceDaoR4UniqueSearchParamTest extends BaseJpaR4Test {
 			myPatientDao.create(pt1).getId().toUnqualifiedVersionless();
 			fail();
 		} catch (PreconditionFailedException e) {
-			assertEquals("Can not create resource of type Patient as it would create a duplicate index matching query: Patient?birthdate=2011-01-01&gender=http%3A%2F%2Fhl7.org%2Ffhir%2Fadministrative-gender%7Cmale (existing index belongs to Patient/" + id1.getIdPart() + ")", e.getMessage());
+			assertEquals("Can not create resource of type Patient as it would create a duplicate unique index matching query: Patient?birthdate=2011-01-01&gender=http%3A%2F%2Fhl7.org%2Ffhir%2Fadministrative-gender%7Cmale (existing index belongs to Patient/" + id1.getIdPart() + ", new unique index created by SearchParameter/patient-gender-birthdate)", e.getMessage());
 		}
 	}
 
@@ -1465,7 +1510,7 @@ public class FhirResourceDaoR4UniqueSearchParamTest extends BaseJpaR4Test {
 			myPatientDao.create(pt1).getId().toUnqualifiedVersionless();
 			fail();
 		} catch (PreconditionFailedException e) {
-			// good
+			assertThat(e.getMessage(), containsString("new unique index created by SearchParameter/patient-gender-birthdate"));
 		}
 
 		Patient pt2 = new Patient();
@@ -1480,7 +1525,7 @@ public class FhirResourceDaoR4UniqueSearchParamTest extends BaseJpaR4Test {
 			myPatientDao.update(pt2);
 			fail();
 		} catch (PreconditionFailedException e) {
-			// good
+			assertThat(e.getMessage(), containsString("new unique index created by SearchParameter/patient-gender-birthdate"));
 		}
 
 	}

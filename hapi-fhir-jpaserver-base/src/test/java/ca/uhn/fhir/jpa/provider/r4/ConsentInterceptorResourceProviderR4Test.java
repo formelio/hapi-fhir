@@ -58,7 +58,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static org.apache.commons.lang3.StringUtils.leftPad;
@@ -66,6 +65,7 @@ import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.blankOrNullString;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -127,6 +127,7 @@ public class ConsentInterceptorResourceProviderR4Test extends BaseResourceProvid
 			.execute();
 		List<IBaseResource> resources = BundleUtil.toListOfResources(myFhirCtx, result);
 		List<String> returnedIdValues = toUnqualifiedVersionlessIdValues(resources);
+		assertThat(returnedIdValues, hasSize(15));
 		assertEquals(myObservationIdsEvenOnly.subList(0, 15), returnedIdValues);
 
 		// Fetch the next page
@@ -136,6 +137,7 @@ public class ConsentInterceptorResourceProviderR4Test extends BaseResourceProvid
 			.execute();
 		resources = BundleUtil.toListOfResources(myFhirCtx, result);
 		returnedIdValues = toUnqualifiedVersionlessIdValues(resources);
+		assertThat(returnedIdValues, hasSize(10));
 		assertEquals(myObservationIdsEvenOnly.subList(15, 25), returnedIdValues);
 	}
 
@@ -561,15 +563,15 @@ public class ConsentInterceptorResourceProviderR4Test extends BaseResourceProvid
 		assertEquals(1, response.getEntry().size());
 		assertNull(response.getTotalElement().getValue());
 
-		// The paging should have ended now - but the last redacted female result is an empty existing page which should never have been there.
-		assertNull(BundleUtil.getLinkUrlOfType(myFhirCtx, response, "next"));
-
-		runInTransaction(()->{
-			Search search = mySearchEntityDao.findByUuidAndFetchIncludes(searchId).orElseThrow(()->new IllegalStateException());
+		runInTransaction(() -> {
+			Search search = mySearchEntityDao.findByUuidAndFetchIncludes(searchId).orElseThrow(() -> new IllegalStateException());
 			assertEquals(3, search.getNumFound());
 			assertEquals(1, search.getNumBlocked());
 			assertEquals(2, search.getTotalCount());
 		});
+
+		// The paging should have ended now - but the last redacted female result is an empty existing page which should never have been there.
+		assertNull(BundleUtil.getLinkUrlOfType(myFhirCtx, response, "next"));
 	}
 
 	/**
@@ -577,7 +579,8 @@ public class ConsentInterceptorResourceProviderR4Test extends BaseResourceProvid
 	 */
 	@Test
 	public void testDefaultInterceptorAllowsAll() {
-		myConsentInterceptor = new ConsentInterceptor(new IConsentService() {});
+		myConsentInterceptor = new ConsentInterceptor(new IConsentService() {
+		});
 		ourRestServer.getInterceptorService().registerInterceptor(myConsentInterceptor);
 
 		myClient.create().resource(new Patient().setGender(Enumerations.AdministrativeGender.MALE).addName(new HumanName().setFamily("1"))).execute();
@@ -598,8 +601,8 @@ public class ConsentInterceptorResourceProviderR4Test extends BaseResourceProvid
 		// The paging should have ended now - but the last redacted female result is an empty existing page which should never have been there.
 		assertNotNull(BundleUtil.getLinkUrlOfType(myFhirCtx, response, "next"));
 
-		runInTransaction(()->{
-			Search search = mySearchEntityDao.findByUuidAndFetchIncludes(searchId).orElseThrow(()->new IllegalStateException());
+		runInTransaction(() -> {
+			Search search = mySearchEntityDao.findByUuidAndFetchIncludes(searchId).orElseThrow(() -> new IllegalStateException());
 			assertEquals(3, search.getNumFound());
 			assertEquals(0, search.getNumBlocked());
 			assertEquals(3, search.getTotalCount());
@@ -611,7 +614,8 @@ public class ConsentInterceptorResourceProviderR4Test extends BaseResourceProvid
 	 */
 	@Test
 	public void testDefaultInterceptorAllowsFailure() {
-		myConsentInterceptor = new ConsentInterceptor(new IConsentService() {});
+		myConsentInterceptor = new ConsentInterceptor(new IConsentService() {
+		});
 		ourRestServer.getInterceptorService().registerInterceptor(myConsentInterceptor);
 
 		myClient.create().resource(new Patient().setGender(Enumerations.AdministrativeGender.MALE).addName(new HumanName().setFamily("1"))).execute();

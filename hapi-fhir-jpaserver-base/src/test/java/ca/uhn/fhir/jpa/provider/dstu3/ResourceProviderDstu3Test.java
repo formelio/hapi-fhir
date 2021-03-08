@@ -33,9 +33,9 @@ import ca.uhn.fhir.rest.server.exceptions.UnprocessableEntityException;
 import ca.uhn.fhir.rest.server.interceptor.BaseValidatingInterceptor;
 import ca.uhn.fhir.rest.server.interceptor.RequestValidatingInterceptor;
 import ca.uhn.fhir.util.HapiExtensions;
-import ca.uhn.fhir.util.TestUtil;
 import ca.uhn.fhir.util.UrlUtil;
 import ca.uhn.fhir.validation.IValidatorModule;
+import ca.uhn.fhir.validation.ResultSeverityEnum;
 import com.google.common.base.Charsets;
 import com.google.common.collect.Lists;
 import org.apache.commons.io.IOUtils;
@@ -66,6 +66,7 @@ import org.hl7.fhir.dstu3.model.Bundle.HTTPVerb;
 import org.hl7.fhir.dstu3.model.Bundle.SearchEntryMode;
 import org.hl7.fhir.dstu3.model.CodeSystem;
 import org.hl7.fhir.dstu3.model.CodeType;
+import org.hl7.fhir.dstu3.model.CodeableConcept;
 import org.hl7.fhir.dstu3.model.Coding;
 import org.hl7.fhir.dstu3.model.Condition;
 import org.hl7.fhir.dstu3.model.DateTimeType;
@@ -76,9 +77,11 @@ import org.hl7.fhir.dstu3.model.DocumentReference;
 import org.hl7.fhir.dstu3.model.Encounter;
 import org.hl7.fhir.dstu3.model.Encounter.EncounterLocationComponent;
 import org.hl7.fhir.dstu3.model.Encounter.EncounterStatus;
+import org.hl7.fhir.dstu3.model.Enumerations;
 import org.hl7.fhir.dstu3.model.Enumerations.AdministrativeGender;
 import org.hl7.fhir.dstu3.model.Extension;
 import org.hl7.fhir.dstu3.model.IdType;
+import org.hl7.fhir.dstu3.model.Identifier;
 import org.hl7.fhir.dstu3.model.ImagingStudy;
 import org.hl7.fhir.dstu3.model.InstantType;
 import org.hl7.fhir.dstu3.model.IntegerType;
@@ -96,6 +99,7 @@ import org.hl7.fhir.dstu3.model.Organization;
 import org.hl7.fhir.dstu3.model.Parameters;
 import org.hl7.fhir.dstu3.model.Patient;
 import org.hl7.fhir.dstu3.model.Period;
+import org.hl7.fhir.dstu3.model.PlanDefinition;
 import org.hl7.fhir.dstu3.model.Practitioner;
 import org.hl7.fhir.dstu3.model.ProcedureRequest;
 import org.hl7.fhir.dstu3.model.Quantity;
@@ -103,16 +107,18 @@ import org.hl7.fhir.dstu3.model.Questionnaire;
 import org.hl7.fhir.dstu3.model.Questionnaire.QuestionnaireItemType;
 import org.hl7.fhir.dstu3.model.QuestionnaireResponse;
 import org.hl7.fhir.dstu3.model.Reference;
+import org.hl7.fhir.dstu3.model.RelatedArtifact;
 import org.hl7.fhir.dstu3.model.StringType;
 import org.hl7.fhir.dstu3.model.StructureDefinition;
 import org.hl7.fhir.dstu3.model.Subscription;
 import org.hl7.fhir.dstu3.model.Subscription.SubscriptionChannelType;
 import org.hl7.fhir.dstu3.model.Subscription.SubscriptionStatus;
+import org.hl7.fhir.dstu3.model.Task;
 import org.hl7.fhir.dstu3.model.UnsignedIntType;
 import org.hl7.fhir.dstu3.model.ValueSet;
+import org.hl7.fhir.dstu3.model.codesystems.DeviceStatus;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.instance.model.api.IIdType;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
@@ -138,6 +144,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.UUID;
 
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -231,6 +238,56 @@ public class ResourceProviderDstu3Test extends BaseResourceProviderDstu3Test {
 
 		// Assert
 		assertEquals(0, returnedBundle.getEntry().size());
+	}
+
+	@Test
+	public void testSuppressNoExtensibleWarnings() {
+		RequestValidatingInterceptor interceptor = new RequestValidatingInterceptor();
+		interceptor.setFailOnSeverity(ResultSeverityEnum.INFORMATION);
+		FhirInstanceValidator val = new FhirInstanceValidator(myValidationSupport);
+		val.setNoExtensibleWarnings(true);
+		interceptor.addValidatorModule(val);
+
+		ourRestServer.registerInterceptor(interceptor);
+		try {
+			CodeableConcept codeableConcept = new CodeableConcept();
+			Coding codingCode = codeableConcept.addCoding();
+			codingCode.setCode(DeviceStatus.ACTIVE.toCode());
+			codingCode.setSystem(DeviceStatus.ACTIVE.getSystem());
+
+			Device device = new Device();
+			Identifier identifier = device.addIdentifier();
+			identifier.setType(codeableConcept); // Not valid against valueset with 'Extensible' binding strength
+			ourClient.create().resource(device).execute().getId();
+		} finally {
+			ourRestServer.unregisterInterceptor(interceptor);
+		}
+	}
+
+	@Test
+	public void testSuppressNoBindingMessage() {
+		RequestValidatingInterceptor interceptor = new RequestValidatingInterceptor();
+		interceptor.setFailOnSeverity(ResultSeverityEnum.INFORMATION);
+		FhirInstanceValidator val = new FhirInstanceValidator(myValidationSupport);
+		val.setNoBindingMsgSuppressed(true);
+		interceptor.addValidatorModule(val);
+
+		ourRestServer.registerInterceptor(interceptor);
+		try {
+			CodeableConcept codeableConcept = new CodeableConcept();
+			Coding codingCode = codeableConcept.addCoding();
+			codingCode.setSystem(DeviceStatus.ACTIVE.toCode());
+			codingCode.setSystem(DeviceStatus.ACTIVE.getSystem());
+
+			Task task = new Task();
+			task.setStatus(Task.TaskStatus.DRAFT);
+			task.setIntent(Task.TaskIntent.FILLERORDER);
+			task.setCode(codeableConcept); // Task.code has no source/binding
+
+			ourClient.create().resource(task).execute().getId();
+		} finally {
+			ourRestServer.unregisterInterceptor(interceptor);
+		}
 	}
 
 	/**
@@ -363,6 +420,45 @@ public class ResourceProviderDstu3Test extends BaseResourceProviderDstu3Test {
 	}
 
 	@Test
+	public void testSearchWithIncludeAllWithNotResolvableReference() {
+		// Arrange
+		myDaoConfig.setAllowExternalReferences(true);
+
+		Patient patient = new Patient();
+		patient.addName().setFamily(UUID.randomUUID().toString());
+		IIdType createdPatientId = ourClient.create().resource(patient).execute().getId();
+
+		RelatedArtifact relatedArtifactInternalReference = new RelatedArtifact();
+		relatedArtifactInternalReference.setDisplay(UUID.randomUUID().toString());
+		relatedArtifactInternalReference.setType(RelatedArtifact.RelatedArtifactType.PREDECESSOR);
+		relatedArtifactInternalReference.setResource(new Reference(createdPatientId.toUnqualifiedVersionless()));
+
+		RelatedArtifact relatedArtifactExternalReference = new RelatedArtifact();
+		relatedArtifactExternalReference.setDisplay(UUID.randomUUID().toString());
+		relatedArtifactExternalReference.setType(RelatedArtifact.RelatedArtifactType.PREDECESSOR);
+		relatedArtifactExternalReference.setResource(new Reference("http://not-local-host.dk/hapi-fhir-jpaserver/fhir/Patient/2"));
+
+		PlanDefinition planDefinition = new PlanDefinition();
+		planDefinition.setStatus(Enumerations.PublicationStatus.ACTIVE);
+		planDefinition.setName(UUID.randomUUID().toString());
+		planDefinition.setRelatedArtifact(Arrays.asList(relatedArtifactInternalReference, relatedArtifactExternalReference));
+		IIdType createdPlanDefinitionId = ourClient.create().resource(planDefinition).execute().getId();
+
+		// Act
+		Bundle returnedBundle = ourClient.search()
+			.forResource(PlanDefinition.class)
+			.include(PlanDefinition.INCLUDE_ALL)
+			.where(PlanDefinition.NAME.matches().value(planDefinition.getName()))
+			.returnBundle(Bundle.class)
+			.execute();
+
+		// Assert
+		assertEquals(returnedBundle.getEntry().size(), 2);
+		assertEquals(createdPlanDefinitionId, genResourcesOfType(returnedBundle, PlanDefinition.class).get(0).getIdElement());
+		assertEquals(createdPatientId, genResourcesOfType(returnedBundle, Patient.class).get(0).getIdElement());
+	}
+
+	@Test
 	public void testBundleCreateWithTypeTransaction() throws Exception {
 		IGenericClient client = ourClient;
 
@@ -372,7 +468,7 @@ public class ResourceProviderDstu3Test extends BaseResourceProviderDstu3Test {
 			client.create().resource(resBody).execute().getId();
 			fail();
 		} catch (UnprocessableEntityException e) {
-			assertThat(e.getMessage(), containsString("Unable to store a Bundle resource on this server with a Bundle.type value of: transaction"));
+			assertThat(e.getMessage(), containsString("Unable to store a Bundle resource on this server with a Bundle.type value of: transaction. Note that if you are trying to perform a FHIR transaction or batch operation you should POST the Bundle resource to the Base URL of the server, not to the /Bundle endpoint."));
 		}
 	}
 
@@ -2306,7 +2402,19 @@ public class ResourceProviderDstu3Test extends BaseResourceProviderDstu3Test {
 			.useHttpGet()
 			.execute();
 
-		assertEquals(21, response.getEntry().size());
+		assertEquals(10, response.getEntry().size());
+		assertEquals(null, response.getTotalElement().getValue());
+		assertThat(response.getLink("next").getUrl(), not(emptyString()));
+
+		response = ourClient.fetchResourceFromUrl(Bundle.class, response.getLink("next").getUrl());
+
+		assertEquals(10, response.getEntry().size());
+		assertEquals(null, response.getTotalElement().getValue());
+		assertThat(response.getLink("next").getUrl(), not(emptyString()));
+
+		response = ourClient.fetchResourceFromUrl(Bundle.class, response.getLink("next").getUrl());
+
+		assertEquals(1, response.getEntry().size());
 		assertEquals(21, response.getTotalElement().getValue().intValue());
 		assertEquals(null, response.getLink("next"));
 
@@ -3359,24 +3467,87 @@ public class ResourceProviderDstu3Test extends BaseResourceProviderDstu3Test {
 	}
 
 	@Test
-	public void testSearchWithInvalidSort() {
-		try {
-		Observation o = new Observation();
-		o.getCode().setText("testSearchWithInvalidSort");
-		myObservationDao.create(o, mySrd);
-		ourClient
-			.search()
-			.forResource(Observation.class)
-			.sort().ascending(Observation.CODE_VALUE_QUANTITY) // composite sort not supported yet
-			.prettyPrint()
-			.returnBundle(Bundle.class)
-			.execute();
-			fail();
-		} catch (InvalidRequestException e) {
-			assertEquals("HTTP 400 Bad Request: This server does not support _sort specifications of type COMPOSITE - Can't serve _sort=code-value-quantity", e.getMessage());
+	public void testSearchWithCompositeSort_CodeValueDate() throws IOException {
+		
+		IIdType pid0;
+		IIdType oid1;
+		IIdType oid2;
+		IIdType oid3;
+		IIdType oid4;
+		{
+			Patient patient = new Patient();
+			patient.addIdentifier().setSystem("urn:system").setValue("001");
+			patient.addName().setFamily("Tester").addGiven("Joe");
+			pid0 = myPatientDao.create(patient, mySrd).getId().toUnqualifiedVersionless();
 		}
+		{
+			Observation obs = new Observation();
+			obs.addIdentifier().setSystem("urn:system").setValue("FOO");
+			obs.getSubject().setReferenceElement(pid0);
+			obs.getCode().addCoding().setCode("2345-7").setSystem("http://loinc.org");
+			obs.setValue(new DateTimeType("2020-02-01"));
+			
+			oid1 = myObservationDao.create(obs, mySrd).getId().toUnqualifiedVersionless();
+			
+			ourLog.info("Observation: \n" + myFhirCtx.newJsonParser().setPrettyPrint(true).encodeResourceToString(obs));
+		}
+		
+		{
+			Observation obs = new Observation();
+			obs.addIdentifier().setSystem("urn:system").setValue("FOO");
+			obs.getSubject().setReferenceElement(pid0);
+			obs.getCode().addCoding().setCode("2345-7").setSystem("http://loinc.org");
+			obs.setValue(new DateTimeType("2020-04-01"));
+			
+			oid2 = myObservationDao.create(obs, mySrd).getId().toUnqualifiedVersionless();
+			
+			ourLog.info("Observation: \n" + myFhirCtx.newJsonParser().setPrettyPrint(true).encodeResourceToString(obs));
+		}
+		
+		{
+			Observation obs = new Observation();
+			obs.addIdentifier().setSystem("urn:system").setValue("FOO");
+			obs.getSubject().setReferenceElement(pid0);
+			obs.getCode().addCoding().setCode("2345-7").setSystem("http://loinc.org");
+			obs.setValue(new DateTimeType("2020-01-01"));
+			
+			oid3 = myObservationDao.create(obs, mySrd).getId().toUnqualifiedVersionless();
+			
+			ourLog.info("Observation: \n" + myFhirCtx.newJsonParser().setPrettyPrint(true).encodeResourceToString(obs));
+		}
+		
+		{
+			Observation obs = new Observation();
+			obs.addIdentifier().setSystem("urn:system").setValue("FOO");
+			obs.getSubject().setReferenceElement(pid0);
+			obs.getCode().addCoding().setCode("2345-7").setSystem("http://loinc.org");
+			obs.setValue(new DateTimeType("2020-03-01"));
+			
+			oid4 = myObservationDao.create(obs, mySrd).getId().toUnqualifiedVersionless();
+			
+			ourLog.info("Observation: \n" + myFhirCtx.newJsonParser().setPrettyPrint(true).encodeResourceToString(obs));
+		}
+		
+		String uri = ourServerBase + "/Observation?_sort=code-value-date";
+		Bundle found;
+		
+		HttpGet get = new HttpGet(uri);
+		try (CloseableHttpResponse resp = ourHttpClient.execute(get)) {
+			String output = IOUtils.toString(resp.getEntity().getContent(), Charsets.UTF_8);
+			found = myFhirCtx.newXmlParser().parseResource(Bundle.class, output);
+		}
+		
+		ourLog.info("Bundle: \n" + myFhirCtx.newJsonParser().setPrettyPrint(true).encodeResourceToString(found));
+		
+		List<IIdType> list = toUnqualifiedVersionlessIds(found);
+		assertEquals(4, found.getEntry().size());
+		assertEquals(oid3, list.get(0));
+		assertEquals(oid1, list.get(1));
+		assertEquals(oid4, list.get(2));
+		assertEquals(oid2, list.get(3));
 	}
 
+	
 	@Test
 	public void testSearchWithMissing() {
 		ourLog.info("Starting testSearchWithMissing");

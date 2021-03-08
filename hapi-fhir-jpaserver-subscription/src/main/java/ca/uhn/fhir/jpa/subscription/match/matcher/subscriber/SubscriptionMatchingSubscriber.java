@@ -36,7 +36,7 @@ import static org.apache.commons.lang3.StringUtils.isNotBlank;
  * #%L
  * HAPI FHIR Subscription Server
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -86,7 +86,6 @@ public class SubscriptionMatchingSubscriber implements MessageHandler {
 
 		ResourceModifiedMessage msg = ((ResourceModifiedJsonMessage) theMessage).getPayload();
 		matchActiveSubscriptionsAndDeliver(msg);
-
 	}
 
 	public void matchActiveSubscriptionsAndDeliver(ResourceModifiedMessage theMsg) {
@@ -164,7 +163,7 @@ public class SubscriptionMatchingSubscriber implements MessageHandler {
 			deliveryMsg.setPayload(myFhirContext, payload, encoding);
 			deliveryMsg.setSubscription(subscription);
 			deliveryMsg.setOperationType(theMsg.getOperationType());
-			deliveryMsg.setParentTransactionGuid(theMsg.getParentTransactionGuid());
+			deliveryMsg.setTransactionId(theMsg.getTransactionId());
 			deliveryMsg.copyAdditionalPropertiesFrom(theMsg);
 
 			// Interceptor call: SUBSCRIPTION_RESOURCE_MATCHED

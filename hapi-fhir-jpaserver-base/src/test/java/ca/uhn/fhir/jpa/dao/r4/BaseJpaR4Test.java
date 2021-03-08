@@ -22,11 +22,14 @@ import ca.uhn.fhir.jpa.config.TestR4Config;
 import ca.uhn.fhir.jpa.dao.BaseJpaTest;
 import ca.uhn.fhir.jpa.dao.IFulltextSearchSvc;
 import ca.uhn.fhir.jpa.dao.data.IForcedIdDao;
+import ca.uhn.fhir.jpa.dao.data.IPartitionDao;
 import ca.uhn.fhir.jpa.dao.data.IResourceHistoryTableDao;
 import ca.uhn.fhir.jpa.dao.data.IResourceHistoryTagDao;
 import ca.uhn.fhir.jpa.dao.data.IResourceIndexedCompositeStringUniqueDao;
+import ca.uhn.fhir.jpa.dao.data.IResourceIndexedSearchParamCoordsDao;
 import ca.uhn.fhir.jpa.dao.data.IResourceIndexedSearchParamDateDao;
 import ca.uhn.fhir.jpa.dao.data.IResourceIndexedSearchParamQuantityDao;
+import ca.uhn.fhir.jpa.dao.data.IResourceIndexedSearchParamQuantityNormalizedDao;
 import ca.uhn.fhir.jpa.dao.data.IResourceIndexedSearchParamStringDao;
 import ca.uhn.fhir.jpa.dao.data.IResourceIndexedSearchParamTokenDao;
 import ca.uhn.fhir.jpa.dao.data.IResourceLinkDao;
@@ -52,27 +55,33 @@ import ca.uhn.fhir.jpa.dao.index.IdHelperService;
 import ca.uhn.fhir.jpa.entity.TermCodeSystem;
 import ca.uhn.fhir.jpa.entity.TermCodeSystemVersion;
 import ca.uhn.fhir.jpa.entity.TermConcept;
+import ca.uhn.fhir.jpa.entity.TermValueSet;
+import ca.uhn.fhir.jpa.entity.TermValueSetConcept;
+import ca.uhn.fhir.jpa.entity.TermValueSetConceptDesignation;
 import ca.uhn.fhir.jpa.interceptor.PerformanceTracingLoggingInterceptor;
 import ca.uhn.fhir.jpa.model.config.PartitionSettings;
 import ca.uhn.fhir.jpa.model.entity.ModelConfig;
 import ca.uhn.fhir.jpa.model.entity.ResourceIndexedSearchParamString;
 import ca.uhn.fhir.jpa.model.entity.ResourceTable;
 import ca.uhn.fhir.jpa.partition.IPartitionLookupSvc;
+import ca.uhn.fhir.jpa.provider.r4.BaseJpaResourceProviderObservationR4;
 import ca.uhn.fhir.jpa.provider.r4.JpaSystemProviderR4;
+import ca.uhn.fhir.jpa.rp.r4.ObservationResourceProvider;
 import ca.uhn.fhir.jpa.search.DatabaseBackedPagingProvider;
 import ca.uhn.fhir.jpa.search.IStaleSearchDeletingSvc;
 import ca.uhn.fhir.jpa.search.reindex.IResourceReindexingSvc;
 import ca.uhn.fhir.jpa.search.warm.ICacheWarmingSvc;
 import ca.uhn.fhir.jpa.searchparam.registry.SearchParamRegistryImpl;
-import ca.uhn.fhir.jpa.subscription.match.registry.SubscriptionRegistry;
 import ca.uhn.fhir.jpa.term.BaseTermReadSvcImpl;
 import ca.uhn.fhir.jpa.term.TermDeferredStorageSvcImpl;
+import ca.uhn.fhir.jpa.term.ValueSetExpansionR4Test;
 import ca.uhn.fhir.jpa.term.api.ITermCodeSystemStorageSvc;
 import ca.uhn.fhir.jpa.term.api.ITermDeferredStorageSvc;
 import ca.uhn.fhir.jpa.term.api.ITermLoaderSvc;
 import ca.uhn.fhir.jpa.term.api.ITermReadSvc;
 import ca.uhn.fhir.jpa.term.api.ITermReadSvcR4;
 import ca.uhn.fhir.jpa.util.ResourceCountCache;
+import ca.uhn.fhir.jpa.validation.ValidationSettings;
 import ca.uhn.fhir.parser.IParser;
 import ca.uhn.fhir.parser.StrictErrorHandler;
 import ca.uhn.fhir.rest.api.Constants;
@@ -81,13 +90,12 @@ import ca.uhn.fhir.rest.server.BasePagingProvider;
 import ca.uhn.fhir.rest.server.interceptor.IServerInterceptor;
 import ca.uhn.fhir.rest.server.provider.ResourceProviderFactory;
 import ca.uhn.fhir.test.utilities.ITestDataBuilder;
-import ca.uhn.fhir.util.TestUtil;
 import ca.uhn.fhir.util.UrlUtil;
 import ca.uhn.fhir.validation.FhirValidator;
 import ca.uhn.fhir.validation.ValidationResult;
 import org.apache.commons.io.IOUtils;
-import org.hibernate.search.jpa.FullTextEntityManager;
-import org.hibernate.search.jpa.Search;
+import org.hibernate.search.mapper.orm.Search;
+import org.hibernate.search.mapper.orm.session.SearchSession;
 import org.hl7.fhir.common.hapi.validation.support.CachingValidationSupport;
 import org.hl7.fhir.common.hapi.validation.validator.FhirInstanceValidator;
 import org.hl7.fhir.instance.model.api.IBaseResource;
@@ -97,6 +105,7 @@ import org.hl7.fhir.r4.model.Appointment;
 import org.hl7.fhir.r4.model.AuditEvent;
 import org.hl7.fhir.r4.model.Binary;
 import org.hl7.fhir.r4.model.Bundle;
+import org.hl7.fhir.r4.model.CapabilityStatement;
 import org.hl7.fhir.r4.model.CarePlan;
 import org.hl7.fhir.r4.model.CareTeam;
 import org.hl7.fhir.r4.model.ChargeItem;
@@ -157,6 +166,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.ApplicationContext;
+import org.springframework.data.domain.Pageable;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.util.AopTestUtils;
@@ -168,11 +178,14 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.empty;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.mock;
 
@@ -184,6 +197,8 @@ public abstract class BaseJpaR4Test extends BaseJpaTest implements ITestDataBuil
 
 	@Autowired
 	protected IPartitionLookupSvc myPartitionConfigSvc;
+	@Autowired
+	protected IPartitionDao myPartitionDao;
 	@Autowired
 	protected ITermReadSvc myHapiTerminologySvc;
 	@Autowired
@@ -206,7 +221,11 @@ public abstract class BaseJpaR4Test extends BaseJpaTest implements ITestDataBuil
 	@Autowired
 	protected IResourceIndexedSearchParamTokenDao myResourceIndexedSearchParamTokenDao;
 	@Autowired
+	protected IResourceIndexedSearchParamCoordsDao myResourceIndexedSearchParamCoordsDao;
+	@Autowired
 	protected IResourceIndexedSearchParamQuantityDao myResourceIndexedSearchParamQuantityDao;
+	@Autowired
+	protected IResourceIndexedSearchParamQuantityNormalizedDao myResourceIndexedSearchParamQuantityNormalizedDao;
 	@Autowired
 	protected IResourceIndexedSearchParamDateDao myResourceIndexedSearchParamDateDao;
 	@Autowired
@@ -351,6 +370,9 @@ public abstract class BaseJpaR4Test extends BaseJpaTest implements ITestDataBuil
 	@Qualifier("myDocumentReferenceDaoR4")
 	protected IFhirResourceDao<DocumentReference> myDocumentReferenceDao;
 	@Autowired
+	@Qualifier("myCapabilityStatementDaoR4")
+	protected IFhirResourceDao<CapabilityStatement> myCapabilityStatementDao;
+	@Autowired
 	@Qualifier("myPatientDaoR4")
 	protected IFhirResourceDaoPatient<Patient> myPatientDao;
 	@Autowired
@@ -460,6 +482,8 @@ public abstract class BaseJpaR4Test extends BaseJpaTest implements ITestDataBuil
 	private IdHelperService myIdHelperService;
 	@Autowired
 	protected IBatchJobSubmitter myBatchJobSubmitter;
+	@Autowired
+	protected ValidationSettings myValidationSettings;
 
 	@AfterEach()
 	public void afterCleanupDao() {
@@ -513,10 +537,10 @@ public abstract class BaseJpaR4Test extends BaseJpaTest implements ITestDataBuil
 	@BeforeEach
 	public void beforeFlushFT() {
 		runInTransaction(() -> {
-			FullTextEntityManager ftem = Search.getFullTextEntityManager(myEntityManager);
-			ftem.purgeAll(ResourceTable.class);
-			ftem.purgeAll(ResourceIndexedSearchParamString.class);
-			ftem.flushToIndexes();
+			SearchSession searchSession  = Search.session(myEntityManager);
+			searchSession.workspace(ResourceTable.class).purge();
+//			searchSession.workspace(ResourceIndexedSearchParamString.class).purge();
+			searchSession.indexingPlan().execute();
 		});
 
 		myDaoConfig.setSchedulingDisabled(true);
@@ -534,6 +558,7 @@ public abstract class BaseJpaR4Test extends BaseJpaTest implements ITestDataBuil
 		myDaoConfig.setHardTagListLimit(1000);
 		myDaoConfig.setIncludeLimit(2000);
 		myFhirCtx.setParserErrorHandler(new StrictErrorHandler());
+		myValidationSettings.setLocalReferenceValidationDefaultPolicy(new ValidationSettings().getLocalReferenceValidationDefaultPolicy());
 	}
 
 	@Override
@@ -739,4 +764,69 @@ public abstract class BaseJpaR4Test extends BaseJpaTest implements ITestDataBuil
 		return uuid;
 	}
 
+
+	protected ValueSet.ConceptReferenceDesignationComponent assertConceptContainsDesignation(ValueSet.ValueSetExpansionContainsComponent theConcept, String theLanguage, String theUseSystem, String theUseCode, String theUseDisplay, String theDesignationValue) {
+		Stream<ValueSet.ConceptReferenceDesignationComponent> stream = theConcept.getDesignation().stream();
+		if (theLanguage != null) {
+			stream = stream.filter(designation -> theLanguage.equalsIgnoreCase(designation.getLanguage()));
+		}
+		if (theUseSystem != null) {
+			stream = stream.filter(designation -> theUseSystem.equalsIgnoreCase(designation.getUse().getSystem()));
+		}
+		if (theUseCode != null) {
+			stream = stream.filter(designation -> theUseCode.equalsIgnoreCase(designation.getUse().getCode()));
+		}
+		if (theUseDisplay != null) {
+			stream = stream.filter(designation -> theUseDisplay.equalsIgnoreCase(designation.getUse().getDisplay()));
+		}
+		if (theDesignationValue != null) {
+			stream = stream.filter(designation -> theDesignationValue.equalsIgnoreCase(designation.getValue()));
+		}
+
+		Optional<ValueSet.ConceptReferenceDesignationComponent> first = stream.findFirst();
+		if (!first.isPresent()) {
+			String failureMessage = String.format("Concept %s did not contain designation [%s|%s|%s|%s|%s] ", theConcept.toString(), theLanguage, theUseSystem, theUseCode, theUseDisplay, theDesignationValue);
+			fail(failureMessage);
+			return null;
+		} else {
+			return first.get();
+		}
+	}
+
+	protected ValueSet.ValueSetExpansionContainsComponent assertExpandedValueSetContainsConcept(ValueSet theValueSet, String theSystem, String theCode, String theDisplay, Integer theDesignationCount) {
+		List<ValueSet.ValueSetExpansionContainsComponent> contains = theValueSet.getExpansion().getContains();
+
+		Stream<ValueSet.ValueSetExpansionContainsComponent> stream = contains.stream();
+		if (theSystem != null) {
+			stream = stream.filter(concept -> theSystem.equalsIgnoreCase(concept.getSystem()));
+		}
+		if (theCode != null ) {
+			stream = stream.filter(concept -> theCode.equalsIgnoreCase(concept.getCode()));
+		}
+		if (theDisplay != null){
+			stream = stream.filter(concept -> theDisplay.equalsIgnoreCase(concept.getDisplay()));
+		}
+		if (theDesignationCount != null) {
+			stream = stream.filter(concept -> concept.getDesignation().size() == theDesignationCount);
+		}
+
+		Optional<ValueSet.ValueSetExpansionContainsComponent> first = stream.findFirst();
+		if (!first.isPresent()) {
+			String expandedValueSetString = myFhirCtx.newJsonParser().setPrettyPrint(true).encodeResourceToString(theValueSet);
+			String failureMessage = String.format("Expanded ValueSet %s did not contain concept [%s|%s|%s] with [%d] designations. Outcome:\n%s", theValueSet.getId(), theSystem, theCode, theDisplay, theDesignationCount, expandedValueSetString);
+			fail(failureMessage);
+			return null;
+		} else {
+			return first.get();
+		}
+	}
+	public List<String> getExpandedConceptsByValueSetUrl(String theValuesetUrl) {
+		return runInTransaction(() -> {
+			List<TermValueSet> valueSets = myTermValueSetDao.findTermValueSetByUrl(Pageable.unpaged(), theValuesetUrl);
+			assertEquals(1, valueSets.size());
+			TermValueSet valueSet = valueSets.get(0);
+			List<TermValueSetConcept> concepts = valueSet.getConcepts();
+			return concepts.stream().map(concept -> concept.getCode()).collect(Collectors.toList());
+		});
+	}
 }

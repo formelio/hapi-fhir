@@ -12,6 +12,7 @@ import ca.uhn.fhir.jpa.term.ex.ExpansionTooCostlyException;
 import ca.uhn.fhir.util.ValidateUtil;
 import org.hl7.fhir.convertors.VersionConvertor_40_50;
 import org.hl7.fhir.convertors.conv40_50.CodeSystem40_50;
+import org.hl7.fhir.instance.model.api.IBaseCoding;
 import org.hl7.fhir.instance.model.api.IBaseDatatype;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.r5.model.CodeSystem;
@@ -30,7 +31,7 @@ import javax.transaction.Transactional;
  * #%L
  * HAPI FHIR JPA Server
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -113,6 +114,12 @@ public class TermReadSvcR5 extends BaseTermReadSvcImpl implements IValidationSup
 
 	@Override
 	@Nullable
+	protected org.hl7.fhir.r4.model.Coding toCanonicalCoding(IBaseCoding theCoding) {
+		return VersionConvertor_40_50.convertCoding((Coding) theCoding);
+	}
+
+	@Override
+	@Nullable
 	protected org.hl7.fhir.r4.model.CodeableConcept toCanonicalCodeableConcept(IBaseDatatype theCoding) {
 		return VersionConvertor_40_50.convertCodeableConcept((CodeableConcept) theCoding);
 	}
@@ -135,4 +142,10 @@ public class TermReadSvcR5 extends BaseTermReadSvcImpl implements IValidationSup
 		org.hl7.fhir.r4.model.ValueSet valueSetR4 = toCanonicalValueSet(valueSet);
 		return super.isValueSetPreExpandedForCodeValidation(valueSetR4);
 	}
+
+	@Override
+	public LookupCodeResult lookupCode(ValidationSupportContext theValidationSupportContext, String theSystem, String theCode) {
+		return super.lookupCode(theSystem, theCode);
+	}
+
 }

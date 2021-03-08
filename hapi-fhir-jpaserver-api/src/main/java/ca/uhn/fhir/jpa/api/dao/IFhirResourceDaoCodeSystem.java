@@ -17,7 +17,7 @@ import java.util.List;
  * #%L
  * HAPI FHIR JPA API
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,6 +41,8 @@ public interface IFhirResourceDaoCodeSystem<T extends IBaseResource, CD, CC> ext
 	IValidationSupport.LookupCodeResult lookupCode(IPrimitiveType<String> theCode, IPrimitiveType<String> theSystem, CD theCoding, RequestDetails theRequestDetails);
 
 	SubsumesResult subsumes(IPrimitiveType<String> theCodeA, IPrimitiveType<String> theCodeB, IPrimitiveType<String> theSystem, CD theCodingA, CD theCodingB, RequestDetails theRequestDetails);
+
+	IValidationSupport.CodeValidationResult validateCode(IIdType theCodeSystemId, IPrimitiveType<String> theCodeSystemUrl, IPrimitiveType<String> theVersion, IPrimitiveType<String> theCode, IPrimitiveType<String> theDisplay, CD theCoding, CC theCodeableConcept, RequestDetails theRequestDetails);
 
 	class SubsumesResult {
 

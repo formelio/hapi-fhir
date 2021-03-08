@@ -4,7 +4,7 @@ package ca.uhn.fhir.jpa.dao.r4;
  * #%L
  * HAPI FHIR JPA Server
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,10 +39,13 @@ import java.util.Collections;
 public class FhirResourceDaoCompositionR4 extends BaseHapiFhirResourceDao<Composition> implements IFhirResourceDaoComposition<Composition> {
 
 	@Override
-	public IBundleProvider getDocumentForComposition(HttpServletRequest theServletRequest, IIdType theId, IPrimitiveType<Integer> theCount, DateRangeParam theLastUpdate, SortSpec theSort, RequestDetails theRequestDetails) {
+	public IBundleProvider getDocumentForComposition(HttpServletRequest theServletRequest, IIdType theId, IPrimitiveType<Integer> theCount, IPrimitiveType<Integer> theOffset, DateRangeParam theLastUpdate, SortSpec theSort, RequestDetails theRequestDetails) {
 		SearchParameterMap paramMap = new SearchParameterMap();
 		if (theCount != null) {
 			paramMap.setCount(theCount.getValue());
+		}
+		if (theOffset != null) {
+			paramMap.setOffset(theOffset.getValue());
 		}
 		paramMap.setIncludes(Collections.singleton(IResource.INCLUDE_ALL.asRecursive()));
 		paramMap.setSort(theSort);

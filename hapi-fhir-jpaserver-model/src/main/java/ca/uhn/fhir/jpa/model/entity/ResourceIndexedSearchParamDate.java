@@ -2,9 +2,9 @@ package ca.uhn.fhir.jpa.model.entity;
 
 /*
  * #%L
- * HAPI FHIR Model
+ * HAPI FHIR JPA Model
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
-import org.hibernate.search.annotations.Field;
+import org.hibernate.search.mapper.pojo.mapping.definition.annotation.FullTextField;
 import org.hl7.fhir.r4.model.DateTimeType;
 
 import javax.persistence.Column;
@@ -63,13 +63,15 @@ import java.util.Date;
 public class ResourceIndexedSearchParamDate extends BaseResourceIndexedSearchParam {
 
 	private static final long serialVersionUID = 1L;
+
 	@Column(name = "SP_VALUE_HIGH", nullable = true)
 	@Temporal(TemporalType.TIMESTAMP)
-	@Field
+	@FullTextField
 	public Date myValueHigh;
+
 	@Column(name = "SP_VALUE_LOW", nullable = true)
 	@Temporal(TemporalType.TIMESTAMP)
-	@Field
+	@FullTextField
 	public Date myValueLow;
 
 	/**
@@ -185,6 +187,8 @@ public class ResourceIndexedSearchParamDate extends BaseResourceIndexedSearchPar
 		b.append(getParamName(), obj.getParamName());
 		b.append(getTimeFromDate(getValueHigh()), getTimeFromDate(obj.getValueHigh()));
 		b.append(getTimeFromDate(getValueLow()), getTimeFromDate(obj.getValueLow()));
+		b.append(getValueLowDateOrdinal(), obj.getValueLowDateOrdinal());
+		b.append(getValueHighDateOrdinal(), obj.getValueHighDateOrdinal());
 		b.append(isMissing(), obj.isMissing());
 		return b.isEquals();
 	}
@@ -255,6 +259,8 @@ public class ResourceIndexedSearchParamDate extends BaseResourceIndexedSearchPar
 		b.append("resourceId", getResourcePid());
 		b.append("valueLow", new InstantDt(getValueLow()));
 		b.append("valueHigh", new InstantDt(getValueHigh()));
+		b.append("ordLow", myValueLowDateOrdinal);
+		b.append("ordHigh", myValueHighDateOrdinal);
 		b.append("hashIdentity", myHashIdentity);
 		b.append("missing", isMissing());
 		return b.build();
@@ -262,7 +268,7 @@ public class ResourceIndexedSearchParamDate extends BaseResourceIndexedSearchPar
 
 	@SuppressWarnings("ConstantConditions")
 	@Override
-	public boolean matches(IQueryParameterType theParam, boolean theUseOrdinalDatesForDayComparison) {
+	public boolean matches(IQueryParameterType theParam) {
 		if (!(theParam instanceof DateParam)) {
 			return false;
 		}
@@ -271,9 +277,8 @@ public class ResourceIndexedSearchParamDate extends BaseResourceIndexedSearchPar
 
 
 		boolean result;
-		if (theUseOrdinalDatesForDayComparison) {
+		if (dateParam.getPrecision().ordinal() <= TemporalPrecisionEnum.DAY.ordinal()) {
 			result = matchesOrdinalDateBounds(range);
-			result = matchesDateBounds(range);
 		} else {
 			result = matchesDateBounds(range);
 		}
@@ -324,7 +329,7 @@ public class ResourceIndexedSearchParamDate extends BaseResourceIndexedSearchPar
 		if (theDate == null) {
 			return null;
 		}
-		return (long) DateUtils.convertDatetoDayInteger(theDate);
+		return (long) DateUtils.convertDateToDayInteger(theDate);
 	}
 
 }

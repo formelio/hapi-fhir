@@ -4,7 +4,7 @@ package ca.uhn.fhir.rest.client.impl;
  * #%L
  * HAPI FHIR - Client Framework
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -683,7 +683,7 @@ public class GenericClient extends BaseClient implements IGenericClient {
 
 			OutcomeResponseHandler binding = new OutcomeResponseHandler(myPrefer);
 
-			Map<String, List<String>> params = new HashMap<String, List<String>>();
+			Map<String, List<String>> params = new HashMap<>();
 			return invoke(params, binding, invocation);
 
 		}
@@ -1817,6 +1817,7 @@ public class GenericClient extends BaseClient implements IGenericClient {
 		private List<Include> myInclude = new ArrayList<>();
 		private DateRangeParam myLastUpdated;
 		private Integer myParamLimit;
+		private Integer myParamOffset;
 		private List<Collection<String>> myProfiles = new ArrayList<>();
 		private String myResourceId;
 		private String myResourceName;
@@ -1870,6 +1871,16 @@ public class GenericClient extends BaseClient implements IGenericClient {
 				myParamLimit = theLimitTo;
 			} else {
 				myParamLimit = null;
+			}
+			return this;
+		}
+
+		@Override
+		public IQuery offset(int theOffset) {
+			if (theOffset >= 0) {
+				myParamOffset = theOffset;
+			} else {
+				myParamOffset = null;
 			}
 			return this;
 		}
@@ -1947,6 +1958,10 @@ public class GenericClient extends BaseClient implements IGenericClient {
 
 			if (myParamLimit != null) {
 				addParam(params, Constants.PARAM_COUNT, Integer.toString(myParamLimit));
+			}
+
+			if (myParamOffset != null) {
+				addParam(params, Constants.PARAM_OFFSET, Integer.toString(myParamOffset));
 			}
 
 			if (myLastUpdated != null) {

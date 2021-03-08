@@ -4,7 +4,7 @@ package ca.uhn.fhir.jpa.migrate.taskdef;
  * #%L
  * HAPI FHIR JPA Server - Migration
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -46,6 +46,7 @@ public class CalculateHashesTask extends BaseColumnCalculatorTask {
 	public CalculateHashesTask(VersionEnum theRelease, String theVersion) {
 		super(theRelease, theVersion);
 		setDescription("Calculate resource search parameter index hashes");
+		setPidColumnName("SP_ID");
 	}
 
 	@Override

@@ -13,8 +13,6 @@ import ca.uhn.fhir.parser.IParser;
 import ca.uhn.fhir.rest.api.Constants;
 import ca.uhn.fhir.rest.api.RestOperationTypeEnum;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
-import ca.uhn.fhir.rest.server.interceptor.IServerInterceptor;
-import ca.uhn.fhir.rest.server.interceptor.IServerInterceptor.ActionRequestDetails;
 import ca.uhn.fhir.rest.server.interceptor.ServerOperationInterceptorAdapter;
 import ca.uhn.fhir.rest.server.servlet.ServletRequestDetails;
 import com.google.common.collect.Lists;
@@ -49,9 +47,15 @@ import static org.apache.commons.lang3.time.DateUtils.MILLIS_PER_SECOND;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.startsWith;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 public class ResourceProviderInterceptorR4Test extends BaseResourceProviderR4Test {
 
@@ -95,11 +99,11 @@ public class ResourceProviderInterceptorR4Test extends BaseResourceProviderR4Tes
 
 		Bundle results = myClient.search().forResource(Patient.class).returnBundle(Bundle.class).execute();
 
-		verify(interceptor, times(1)).invoke(eq(Pointcut.JPA_PERFTRACE_SEARCH_FIRST_RESULT_LOADED), myParamsCaptor.capture());
-		verify(interceptor, times(1)).invoke(eq(Pointcut.JPA_PERFTRACE_SEARCH_SELECT_COMPLETE), myParamsCaptor.capture());
-		verify(interceptor, times(0)).invoke(eq(Pointcut.JPA_PERFTRACE_SEARCH_COMPLETE), myParamsCaptor.capture());
-		verify(interceptor, times(1)).invoke(eq(Pointcut.JPA_PERFTRACE_SEARCH_PASS_COMPLETE), myParamsCaptor.capture());
-		verify(interceptor, times(0)).invoke(eq(Pointcut.JPA_PERFTRACE_SEARCH_FAILED), myParamsCaptor.capture());
+		verify(interceptor, timeout(10000).times(1)).invoke(eq(Pointcut.JPA_PERFTRACE_SEARCH_FIRST_RESULT_LOADED), myParamsCaptor.capture());
+		verify(interceptor, timeout(10000).times(1)).invoke(eq(Pointcut.JPA_PERFTRACE_SEARCH_SELECT_COMPLETE), myParamsCaptor.capture());
+		verify(interceptor, timeout(10000).times(0)).invoke(eq(Pointcut.JPA_PERFTRACE_SEARCH_COMPLETE), myParamsCaptor.capture());
+		verify(interceptor, timeout(10000).times(1)).invoke(eq(Pointcut.JPA_PERFTRACE_SEARCH_PASS_COMPLETE), myParamsCaptor.capture());
+		verify(interceptor, timeout(10000).times(0)).invoke(eq(Pointcut.JPA_PERFTRACE_SEARCH_FAILED), myParamsCaptor.capture());
 
 		SearchRuntimeDetails details = myParamsCaptor.getAllValues().get(0).get(SearchRuntimeDetails.class);
 		assertEquals(SearchStatusEnum.PASSCMPLET, details.getSearchStatus());
@@ -108,11 +112,11 @@ public class ResourceProviderInterceptorR4Test extends BaseResourceProviderR4Tes
 		reset(interceptor);
 		results = myClient.loadPage().next(results).execute();
 		assertNotNull(results);
-		verify(interceptor, times(1)).invoke(eq(Pointcut.JPA_PERFTRACE_SEARCH_FIRST_RESULT_LOADED), myParamsCaptor.capture());
-		verify(interceptor, times(1)).invoke(eq(Pointcut.JPA_PERFTRACE_SEARCH_SELECT_COMPLETE), myParamsCaptor.capture());
-		verify(interceptor, times(1)).invoke(eq(Pointcut.JPA_PERFTRACE_SEARCH_COMPLETE), myParamsCaptor.capture());
-		verify(interceptor, times(0)).invoke(eq(Pointcut.JPA_PERFTRACE_SEARCH_PASS_COMPLETE), myParamsCaptor.capture());
-		verify(interceptor, times(0)).invoke(eq(Pointcut.JPA_PERFTRACE_SEARCH_FAILED), myParamsCaptor.capture());
+		verify(interceptor, timeout(10000).times(1)).invoke(eq(Pointcut.JPA_PERFTRACE_SEARCH_FIRST_RESULT_LOADED), myParamsCaptor.capture());
+		verify(interceptor, timeout(10000).times(1)).invoke(eq(Pointcut.JPA_PERFTRACE_SEARCH_SELECT_COMPLETE), myParamsCaptor.capture());
+		verify(interceptor, timeout(10000).times(1)).invoke(eq(Pointcut.JPA_PERFTRACE_SEARCH_COMPLETE), myParamsCaptor.capture());
+		verify(interceptor, timeout(10000).times(0)).invoke(eq(Pointcut.JPA_PERFTRACE_SEARCH_PASS_COMPLETE), myParamsCaptor.capture());
+		verify(interceptor, timeout(10000).times(0)).invoke(eq(Pointcut.JPA_PERFTRACE_SEARCH_FAILED), myParamsCaptor.capture());
 
 	}
 
@@ -327,32 +331,12 @@ public class ResourceProviderInterceptorR4Test extends BaseResourceProviderR4Tes
 		}
 	}
 
-	public class ReflexInterceptor extends ServerOperationInterceptorAdapter {
-		@Override
-		public void resourceCreated(RequestDetails theRequest, IBaseResource theResource) {
-			if (theResource instanceof Patient) {
-				((ServletRequestDetails) theRequest).getServletRequest().setAttribute("CREATED_PATIENT", theResource);
-			}
-		}
-
-		@Override
-		public void processingCompletedNormally(ServletRequestDetails theRequestDetails) {
-			Patient createdPatient = (Patient) theRequestDetails.getServletRequest().getAttribute("CREATED_PATIENT");
-			if (createdPatient != null) {
-				Observation observation = new Observation();
-				observation.setSubject(new Reference(createdPatient.getId()));
-
-				myClient.create().resource(observation).execute();
-			}
-		}
-	}
-
 	@Test
 	public void testInterceptorExpandsSearch() {
 
 		@Interceptor
 		class SearchExpandingInterceptor {
-			
+
 			@Hook(Pointcut.SERVER_INCOMING_REQUEST_POST_PROCESSED)
 			public void enrich(RequestDetails theRequestDetails) {
 
@@ -368,7 +352,7 @@ public class ResourceProviderInterceptorR4Test extends BaseResourceProviderR4Tes
 				}
 
 			}
-			
+
 		}
 
 		Patient p1 = new Patient();
@@ -380,7 +364,7 @@ public class ResourceProviderInterceptorR4Test extends BaseResourceProviderR4Tes
 		o1.setId("o1");
 		o1.getSubject().setReference("Patient/p1");
 		myObservationDao.update(o1);
-		
+
 		Patient p2 = new Patient();
 		p2.setId("p2");
 		p2.addIdentifier().setValue("p2");
@@ -417,28 +401,28 @@ public class ResourceProviderInterceptorR4Test extends BaseResourceProviderR4Tes
 		} finally {
 			ourRestServer.unregisterInterceptor(interceptor);
 		}
-		
-		
+
+
 	}
-	
-	
-	public static void verifyDaoInterceptor(IServerInterceptor theDaoInterceptor) {
-		ArgumentCaptor<ActionRequestDetails> ardCaptor;
-		ArgumentCaptor<RestOperationTypeEnum> opTypeCaptor;
-		ardCaptor = ArgumentCaptor.forClass(ActionRequestDetails.class);
-		opTypeCaptor = ArgumentCaptor.forClass(RestOperationTypeEnum.class);
-		verify(theDaoInterceptor, atLeast(1)).incomingRequestPreHandled(opTypeCaptor.capture(), ardCaptor.capture());
-//		boolean good = false;
-//		for (int i = 0; i < opTypeCaptor.getAllValues().size(); i++) {
-//			if (RestOperationTypeEnum.CREATE.equals(opTypeCaptor.getAllValues().get(i))) {
-//				if ("Patient".equals(ardCaptor.getValue().getResourceType())) {
-//					if (ardCaptor.getValue().getResource() != null) {
-//						good = true;
-//					}
-//				}
-//			}
-//		}
-//		assertTrue(good);
+
+	public class ReflexInterceptor extends ServerOperationInterceptorAdapter {
+		@Override
+		public void resourceCreated(RequestDetails theRequest, IBaseResource theResource) {
+			if (theResource instanceof Patient) {
+				((ServletRequestDetails) theRequest).getServletRequest().setAttribute("CREATED_PATIENT", theResource);
+			}
+		}
+
+		@Override
+		public void processingCompletedNormally(ServletRequestDetails theRequestDetails) {
+			Patient createdPatient = (Patient) theRequestDetails.getServletRequest().getAttribute("CREATED_PATIENT");
+			if (createdPatient != null) {
+				Observation observation = new Observation();
+				observation.setSubject(new Reference(createdPatient.getId()));
+
+				myClient.create().resource(observation).execute();
+			}
+		}
 	}
 
 }

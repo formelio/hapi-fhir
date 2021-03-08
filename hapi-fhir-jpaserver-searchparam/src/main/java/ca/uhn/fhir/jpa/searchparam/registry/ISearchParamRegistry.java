@@ -4,7 +4,7 @@ package ca.uhn.fhir.jpa.searchparam.registry;
  * #%L
  * HAPI FHIR Search Parameters
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ package ca.uhn.fhir.jpa.searchparam.registry;
 import ca.uhn.fhir.context.RuntimeResourceDefinition;
 import ca.uhn.fhir.context.RuntimeSearchParam;
 import ca.uhn.fhir.context.phonetic.IPhoneticEncoder;
+import ca.uhn.fhir.jpa.cache.ResourceChangeResult;
 import ca.uhn.fhir.jpa.searchparam.JpaRuntimeSearchParam;
 
 import java.util.Collection;
@@ -42,9 +43,12 @@ public interface ISearchParamRegistry {
 	 */
 	RuntimeSearchParam getActiveSearchParam(String theResourceName, String theParamName);
 
-	boolean refreshCacheIfNecessary();
+	/**
+	 * @return the number of search parameter entries changed
+	 */
+	ResourceChangeResult refreshCacheIfNecessary();
 
-	Map<String, Map<String, RuntimeSearchParam>> getActiveSearchParams();
+	ReadOnlySearchParamCache getActiveSearchParams();
 
 	Map<String, RuntimeSearchParam> getActiveSearchParams(String theResourceName);
 
@@ -68,4 +72,13 @@ public interface ISearchParamRegistry {
 	 * @since 5.1.0
 	 */
 	void setPhoneticEncoder(IPhoneticEncoder thePhoneticEncoder);
+
+	/**
+	 * Returns a collection containing all of the valid active search parameters. This method is intended for
+	 * creating error messages for users as opposed to actual search processing. It will include meta parameters
+	 * such as <code>_id</code> and <code>_lastUpdated</code>.
+	 */
+	default Collection<String> getValidSearchParameterNamesIncludingMeta(String theResourceName) {
+		return getActiveSearchParams().getValidSearchParameterNamesIncludingMeta(theResourceName);
+	}
 }

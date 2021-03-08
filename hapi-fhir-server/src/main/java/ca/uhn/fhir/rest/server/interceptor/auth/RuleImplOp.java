@@ -39,7 +39,7 @@ import static org.apache.commons.lang3.StringUtils.isNotBlank;
  * #%L
  * HAPI FHIR - Server Framework
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -67,6 +67,7 @@ class RuleImplOp extends BaseRule /* implements IAuthRule */ {
 	private TransactionAppliesToEnum myTransactionAppliesToOp;
 	private Collection<IIdType> myAppliesToInstances;
 	private boolean myAppliesToDeleteCascade;
+	private boolean myAppliesToDeleteExpunge;
 
 	/**
 	 * Constructor
@@ -229,6 +230,9 @@ class RuleImplOp extends BaseRule /* implements IAuthRule */ {
 				break;
 			case DELETE:
 				if (theOperation == RestOperationTypeEnum.DELETE) {
+					if (thePointcut == Pointcut.STORAGE_PRE_DELETE_EXPUNGE && myAppliesToDeleteExpunge) {
+						return newVerdict(theOperation, theRequestDetails, theInputResource, theInputResourceId, theOutputResource);
+					}
 					if (myAppliesToDeleteCascade != (thePointcut == Pointcut.STORAGE_CASCADE_DELETE)) {
 						return null;
 					}
@@ -623,4 +627,7 @@ class RuleImplOp extends BaseRule /* implements IAuthRule */ {
 		myAppliesToDeleteCascade = theAppliesToDeleteCascade;
 	}
 
+	void setAppliesToDeleteExpunge(boolean theAppliesToDeleteExpunge) {
+		myAppliesToDeleteExpunge = theAppliesToDeleteExpunge;
+	}
 }

@@ -4,7 +4,7 @@ package ca.uhn.fhir.parser;
  * #%L
  * HAPI FHIR - Core Library
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -991,7 +991,7 @@ public abstract class BaseParser implements IParser {
 
 	protected boolean shouldEncodeResourceId(IBaseResource theResource, EncodeContext theEncodeContext) {
 		boolean retVal = true;
-		if (isOmitResourceId()) {
+		if (isOmitResourceId() && theEncodeContext.getPath().size() == 1) {
 			retVal = false;
 		} else {
 			if (myDontEncodeElements != null) {

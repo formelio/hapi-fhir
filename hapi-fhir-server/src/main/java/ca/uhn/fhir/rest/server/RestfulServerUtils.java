@@ -4,7 +4,7 @@ package ca.uhn.fhir.rest.server;
  * #%L
  * HAPI FHIR - Server Framework
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,8 +28,8 @@ import ca.uhn.fhir.model.api.IResource;
 import ca.uhn.fhir.model.api.Include;
 import ca.uhn.fhir.model.api.ResourceMetadataKeyEnum;
 import ca.uhn.fhir.model.primitive.InstantDt;
-import ca.uhn.fhir.model.valueset.BundleTypeEnum;
 import ca.uhn.fhir.parser.IParser;
+import ca.uhn.fhir.rest.api.BundleLinks;
 import ca.uhn.fhir.rest.api.Constants;
 import ca.uhn.fhir.rest.api.DeleteCascadeModeEnum;
 import ca.uhn.fhir.rest.api.EncodingEnum;
@@ -49,6 +49,7 @@ import ca.uhn.fhir.rest.server.servlet.ServletRequestDetails;
 import ca.uhn.fhir.util.BinaryUtil;
 import ca.uhn.fhir.util.DateUtils;
 import ca.uhn.fhir.util.UrlUtil;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import org.hl7.fhir.instance.model.api.IAnyResource;
 import org.hl7.fhir.instance.model.api.IBaseBinary;
@@ -63,7 +64,19 @@ import javax.annotation.Nullable;
 import javax.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.io.Writer;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Date;
+import java.util.EnumSet;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.StringTokenizer;
+import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -233,20 +246,87 @@ public class RestfulServerUtils {
 		}
 	}
 
-	public static String createPagingLink(Set<Include> theIncludes, RequestDetails theRequestDetails, String theSearchId, int theOffset, int theCount, Map<String, String[]> theRequestParameters, boolean thePrettyPrint,
-													  BundleTypeEnum theBundleType) {
-		return createPagingLink(theIncludes, theRequestDetails, theSearchId, theOffset, theCount, theRequestParameters, thePrettyPrint,
-			theBundleType, null);
+
+	public static String createLinkSelf(String theServerBase, RequestDetails theRequest) {
+		StringBuilder b = new StringBuilder();
+		b.append(theServerBase);
+
+		if (isNotBlank(theRequest.getRequestPath())) {
+			b.append('/');
+			if (isNotBlank(theRequest.getTenantId()) && theRequest.getRequestPath().startsWith(theRequest.getTenantId() + "/")) {
+				b.append(theRequest.getRequestPath().substring(theRequest.getTenantId().length() + 1));
+			} else {
+				b.append(theRequest.getRequestPath());
+			}
+		}
+		// For POST the URL parameters get jumbled with the post body parameters so don't include them, they might be huge
+		if (theRequest.getRequestType() == RequestTypeEnum.GET) {
+			boolean first = true;
+			Map<String, String[]> parameters = theRequest.getParameters();
+			for (String nextParamName : new TreeSet<>(parameters.keySet())) {
+				for (String nextParamValue : parameters.get(nextParamName)) {
+					if (first) {
+						b.append('?');
+						first = false;
+					} else {
+						b.append('&');
+					}
+					b.append(UrlUtil.escapeUrlParam(nextParamName));
+					b.append('=');
+					b.append(UrlUtil.escapeUrlParam(nextParamValue));
+				}
+			}
+		}
+
+		return b.toString();
 	}
 
-	public static String createPagingLink(Set<Include> theIncludes, RequestDetails theRequestDetails, String theSearchId, String thePageId, Map<String, String[]> theRequestParameters, boolean thePrettyPrint,
-													  BundleTypeEnum theBundleType) {
-		return createPagingLink(theIncludes, theRequestDetails, theSearchId, null, null, theRequestParameters, thePrettyPrint,
-			theBundleType, thePageId);
+	public static String createOffsetPagingLink(BundleLinks theBundleLinks, String requestPath, String tenantId, Integer theOffset, Integer theCount, Map<String, String[]> theRequestParameters) {
+		StringBuilder b = new StringBuilder();
+		b.append(theBundleLinks.serverBase);
+
+		if (isNotBlank(requestPath)) {
+			b.append('/');
+			if (isNotBlank(tenantId) && requestPath.startsWith(tenantId + "/")) {
+				b.append(requestPath.substring(tenantId.length() + 1));
+			} else {
+				b.append(requestPath);
+			}
+		}
+
+		Map<String, String[]> params = Maps.newLinkedHashMap(theRequestParameters);
+		params.put(Constants.PARAM_OFFSET, new String[]{String.valueOf(theOffset)});
+		params.put(Constants.PARAM_COUNT, new String[]{String.valueOf(theCount)});
+
+		boolean first = true;
+		for (String nextParamName : new TreeSet<>(params.keySet())) {
+			for (String nextParamValue : params.get(nextParamName)) {
+				if (first) {
+					b.append('?');
+					first = false;
+				} else {
+					b.append('&');
+				}
+				b.append(UrlUtil.escapeUrlParam(nextParamName));
+				b.append('=');
+				b.append(UrlUtil.escapeUrlParam(nextParamValue));
+			}
+		}
+
+		return b.toString();
 	}
 
-	private static String createPagingLink(Set<Include> theIncludes, RequestDetails theRequestDetails, String theSearchId, Integer theOffset, Integer theCount, Map<String, String[]> theRequestParameters, boolean thePrettyPrint,
-														BundleTypeEnum theBundleType, String thePageId) {
+	public static String createPagingLink(BundleLinks theBundleLinks, RequestDetails theRequestDetails, String theSearchId, int theOffset, int theCount, Map<String, String[]> theRequestParameters) {
+		return createPagingLink(theBundleLinks, theRequestDetails, theSearchId, theOffset, theCount, theRequestParameters, null);
+	}
+
+	public static String createPagingLink(BundleLinks theBundleLinks, RequestDetails theRequestDetails, String theSearchId, String thePageId, Map<String, String[]> theRequestParameters) {
+		return createPagingLink(theBundleLinks, theRequestDetails, theSearchId, null, null, theRequestParameters,
+			thePageId);
+	}
+
+	private static String createPagingLink(BundleLinks theBundleLinks, RequestDetails theRequestDetails, String theSearchId, Integer theOffset, Integer theCount, Map<String, String[]> theRequestParameters,
+														String thePageId) {
 
 		String serverBase = theRequestDetails.getFhirServerBase();
 
@@ -284,15 +364,15 @@ public class RestfulServerUtils {
 			format = replace(format, " ", "+");
 			b.append(UrlUtil.escapeUrlParam(format));
 		}
-		if (thePrettyPrint) {
+		if (theBundleLinks.prettyPrint) {
 			b.append('&');
 			b.append(Constants.PARAM_PRETTY);
 			b.append('=');
 			b.append(Constants.PARAM_PRETTY_VALUE_TRUE);
 		}
 
-		if (theIncludes != null) {
-			for (Include nextInclude : theIncludes) {
+		if (theBundleLinks.getIncludes() != null) {
+			for (Include nextInclude : theBundleLinks.getIncludes()) {
 				if (isNotBlank(nextInclude.getValue())) {
 					b.append('&');
 					b.append(Constants.PARAM_INCLUDE);
@@ -302,11 +382,11 @@ public class RestfulServerUtils {
 			}
 		}
 
-		if (theBundleType != null) {
+		if (theBundleLinks.bundleType != null) {
 			b.append('&');
 			b.append(Constants.PARAM_BUNDLETYPE);
 			b.append('=');
-			b.append(theBundleType.getCode());
+			b.append(theBundleLinks.bundleType.getCode());
 		}
 
 		// _elements
@@ -573,6 +653,10 @@ public class RestfulServerUtils {
 		return RestfulServerUtils.tryToExtractNamedParameter(theRequest, Constants.PARAM_COUNT);
 	}
 
+	public static Integer extractOffsetParameter(RequestDetails theRequest) {
+		return RestfulServerUtils.tryToExtractNamedParameter(theRequest, Constants.PARAM_OFFSET);
+	}
+
 	public static IPrimitiveType<Date> extractLastUpdatedFromResource(IBaseResource theResource) {
 		IPrimitiveType<Date> lastUpdated = null;
 		if (theResource instanceof IResource) {
@@ -638,6 +722,9 @@ public class RestfulServerUtils {
 		switch (responseEncoding) {
 			case JSON:
 				parser = context.newJsonParser();
+				break;
+			case RDF:
+				parser = context.newRDFParser();
 				break;
 			case XML:
 			default:

@@ -12,7 +12,7 @@ import java.util.Collection;
  * #%L
  * HAPI FHIR JPA API
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,8 +34,9 @@ import java.util.Collection;
  * time to time, even within minor point releases.
  */
 public interface IDao {
+	String RESOURCE_PID_KEY = "RESOURCE_PID";
 
-	MetadataKeyResourcePid RESOURCE_PID = new MetadataKeyResourcePid("RESOURCE_PID");
+	MetadataKeyResourcePid RESOURCE_PID = new MetadataKeyResourcePid(RESOURCE_PID_KEY);
 
 	MetadataKeyCurrentlyReindexing CURRENTLY_REINDEXING = new MetadataKeyCurrentlyReindexing("CURRENTLY_REINDEXING");
 

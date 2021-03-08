@@ -4,7 +4,7 @@ package ca.uhn.fhir.jpa.search;
  * #%L
  * HAPI FHIR JPA Server
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,6 +34,7 @@ import ca.uhn.fhir.jpa.dao.ISearchBuilder;
 import ca.uhn.fhir.jpa.dao.SearchBuilderFactory;
 import ca.uhn.fhir.jpa.entity.Search;
 import ca.uhn.fhir.jpa.entity.SearchTypeEnum;
+import ca.uhn.fhir.jpa.search.cache.SearchCacheStatusEnum;
 import ca.uhn.fhir.rest.api.server.storage.ResourcePersistentId;
 import ca.uhn.fhir.jpa.model.entity.BaseHasResource;
 import ca.uhn.fhir.jpa.model.entity.ResourceHistoryTable;
@@ -51,7 +52,6 @@ import ca.uhn.fhir.rest.api.server.SimplePreResourceShowDetails;
 import ca.uhn.fhir.rest.server.servlet.ServletRequestDetails;
 import com.google.common.annotations.VisibleForTesting;
 import org.hl7.fhir.instance.model.api.IBaseResource;
-import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -108,7 +108,7 @@ public class PersistedJpaBundleProvider implements IBundleProvider {
 	private final RequestDetails myRequest;
 	private Search mySearchEntity;
 	private String myUuid;
-	private boolean myCacheHit;
+	private SearchCacheStatusEnum myCacheStatus;
 	private RequestPartitionId myRequestPartitionId;
 
 	/**
@@ -190,7 +190,7 @@ public class PersistedJpaBundleProvider implements IBundleProvider {
 		return retVal;
 	}
 
-	@NotNull
+	@Nonnull
 	private RequestPartitionId getRequestPartitionId() {
 		if (myRequestPartitionId == null) {
 			if (mySearchEntity.getResourceId() != null) {
@@ -299,12 +299,12 @@ public class PersistedJpaBundleProvider implements IBundleProvider {
 		return myUuid;
 	}
 
-	public boolean isCacheHit() {
-		return myCacheHit;
+	public SearchCacheStatusEnum getCacheStatus() {
+		return myCacheStatus;
 	}
 
-	void setCacheHit() {
-		myCacheHit = true;
+	void setCacheStatus(SearchCacheStatusEnum theSearchCacheStatusEnum) {
+		myCacheStatus = theSearchCacheStatusEnum;
 	}
 
 	@Override
@@ -353,6 +353,11 @@ public class PersistedJpaBundleProvider implements IBundleProvider {
 			return mySearchCoordinatorSvc.getSearchTotal(myUuid).orElse(null);
 		}
 
+	}
+
+	protected boolean hasIncludes() {
+		ensureSearchEntityLoaded();
+		return !mySearchEntity.getIncludes().isEmpty();
 	}
 
 	// Note: Leave as protected, HSPC depends on this

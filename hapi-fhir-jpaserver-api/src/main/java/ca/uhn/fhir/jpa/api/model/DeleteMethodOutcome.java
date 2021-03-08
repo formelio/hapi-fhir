@@ -4,7 +4,7 @@ package ca.uhn.fhir.jpa.api.model;
  * #%L
  * HAPI FHIR JPA API
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,6 +32,8 @@ import java.util.List;
 public class DeleteMethodOutcome extends MethodOutcome {
 
 	private List<ResourceTable> myDeletedEntities;
+	private long myExpungedResourcesCount;
+	private long myExpungedEntitiesCount;
 
 	public List<ResourceTable> getDeletedEntities() {
 		return myDeletedEntities;
@@ -42,4 +44,21 @@ public class DeleteMethodOutcome extends MethodOutcome {
 		return this;
 	}
 
+	public long getExpungedResourcesCount() {
+		return myExpungedResourcesCount;
+	}
+
+	public DeleteMethodOutcome setExpungedResourcesCount(long theExpungedResourcesCount) {
+		myExpungedResourcesCount = theExpungedResourcesCount;
+		return this;
+	}
+
+	public long getExpungedEntitiesCount() {
+		return myExpungedEntitiesCount;
+	}
+
+	public DeleteMethodOutcome setExpungedEntitiesCount(long theExpungedEntitiesCount) {
+		myExpungedEntitiesCount = theExpungedEntitiesCount;
+		return this;
+	}
 }

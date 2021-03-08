@@ -4,7 +4,7 @@
 	<parent>
 		<groupId>ca.uhn.hapi.fhir</groupId>
 		<artifactId>hapi-deployable-pom</artifactId>
-		<version>5.1.0</version>
+		<version>5.3.0</version>
 		<relativePath>../hapi-deployable-pom/pom.xml</relativePath>
 	</parent>
 
@@ -67,9 +67,13 @@
 				<extensions>true</extensions>
 				<configuration>
 					<instructions>
+                        <_nouses>true</_nouses>
+                        <_removeheaders>Built-By, Include-Resource, Private-Package, Require-Capability</_removeheaders>
+                        <!-- No need to disable normal OSGi class loading
 						<Fragment-Host>
 							ca.uhn.hapi.fhir.hapi-fhir-base
 						</Fragment-Host>
+						-->
 					</instructions>
 				</configuration>
 			</plugin>

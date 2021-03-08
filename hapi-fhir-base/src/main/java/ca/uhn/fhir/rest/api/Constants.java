@@ -4,7 +4,7 @@ package ca.uhn.fhir.rest.api;
  * #%L
  * HAPI FHIR - Core Library
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -154,6 +154,7 @@ public class Constants {
 	public static final String PARAM_CONTAINED_TYPE = "_containedType";
 	public static final String PARAM_CONTENT = "_content";
 	public static final String PARAM_COUNT = "_count";
+	public static final String PARAM_OFFSET = "_offset";
 	public static final String PARAM_DELETE = "_delete";
 	public static final String PARAM_ELEMENTS = "_elements";
 	public static final String PARAM_ELEMENTS_EXCLUDE_MODIFIER = ":exclude";

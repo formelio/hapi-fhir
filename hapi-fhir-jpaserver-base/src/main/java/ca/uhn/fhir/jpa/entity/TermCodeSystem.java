@@ -4,7 +4,7 @@ package ca.uhn.fhir.jpa.entity;
  * #%L
  * HAPI FHIR JPA Server
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -58,7 +58,7 @@ public class TermCodeSystem implements Serializable {
 	@Column(name = "PID")
 	private Long myPid;
 	@OneToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "RES_ID", referencedColumnName = "RES_ID", nullable = false, updatable = false, foreignKey = @ForeignKey(name = "FK_TRMCODESYSTEM_RES"))
+	@JoinColumn(name = "RES_ID", referencedColumnName = "RES_ID", nullable = false, updatable = true, foreignKey = @ForeignKey(name = "FK_TRMCODESYSTEM_RES"))
 	private ResourceTable myResource;
 	@Column(name = "RES_ID", insertable = false, updatable = false)
 	private Long myResourcePid;

@@ -4,7 +4,7 @@ package ca.uhn.fhir.rest.client.impl;
  * #%L
  * HAPI FHIR - Client Framework
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -211,15 +211,15 @@ public abstract class BaseClient implements IRestfulClient {
 		myRequestFormatParamStyle = theRequestFormatParamStyle;
 	}
 
-	<T> T invokeClient(FhirContext theContext, IClientResponseHandler<T> binding, BaseHttpClientInvocation clientInvocation) {
+	protected <T> T invokeClient(FhirContext theContext, IClientResponseHandler<T> binding, BaseHttpClientInvocation clientInvocation) {
 		return invokeClient(theContext, binding, clientInvocation, false);
 	}
 
-	<T> T invokeClient(FhirContext theContext, IClientResponseHandler<T> binding, BaseHttpClientInvocation clientInvocation, boolean theLogRequestAndResponse) {
+	protected <T> T invokeClient(FhirContext theContext, IClientResponseHandler<T> binding, BaseHttpClientInvocation clientInvocation, boolean theLogRequestAndResponse) {
 		return invokeClient(theContext, binding, clientInvocation, null, null, theLogRequestAndResponse, null, null, null, null, null);
 	}
 
-	<T> T invokeClient(FhirContext theContext, IClientResponseHandler<T> binding, BaseHttpClientInvocation clientInvocation, EncodingEnum theEncoding, Boolean thePrettyPrint,
+	protected <T> T invokeClient(FhirContext theContext, IClientResponseHandler<T> binding, BaseHttpClientInvocation clientInvocation, EncodingEnum theEncoding, Boolean thePrettyPrint,
 							 boolean theLogRequestAndResponse, SummaryEnum theSummaryMode, Set<String> theSubsetElements, CacheControlDirective theCacheControlDirective, String theCustomAcceptHeader,
 							 Map<String, List<String>> theCustomHeaders) {
 
@@ -567,6 +567,10 @@ public abstract class BaseClient implements IRestfulClient {
 
 		@Override
 		public T invokeClient(String theResponseMimeType, InputStream theResponseInputStream, int theResponseStatusCode, Map<String, List<String>> theHeaders) throws BaseServerResponseException {
+			if (theResponseStatusCode == Constants.STATUS_HTTP_204_NO_CONTENT) {
+				return null;
+			}
+
 			EncodingEnum respType = EncodingEnum.forContentType(theResponseMimeType);
 			if (respType == null) {
 				if (myAllowHtmlResponse && theResponseMimeType.toLowerCase().contains(Constants.CT_HTML) && myReturnType != null) {

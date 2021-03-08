@@ -12,7 +12,6 @@ import ca.uhn.fhir.jpa.term.custom.CustomTerminologySet;
 import ca.uhn.fhir.rest.api.server.IBundleProvider;
 import ca.uhn.fhir.rest.param.UriParam;
 import ca.uhn.fhir.rest.server.exceptions.InvalidRequestException;
-import ca.uhn.fhir.util.TestUtil;
 import org.hl7.fhir.r4.model.CodeSystem;
 import org.hl7.fhir.r4.model.CodeType;
 import org.hl7.fhir.r4.model.Coding;
@@ -20,12 +19,12 @@ import org.hl7.fhir.r4.model.Parameters;
 import org.hl7.fhir.r4.model.StringType;
 import org.hl7.fhir.r4.model.ValueSet;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.util.AopTestUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -34,10 +33,10 @@ import java.util.stream.Collectors;
 
 import static org.apache.commons.lang3.StringUtils.leftPad;
 import static org.hamcrest.CoreMatchers.containsString;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.fail;
 
 public class TerminologySvcDeltaR4Test extends BaseJpaR4Test {
@@ -46,8 +45,9 @@ public class TerminologySvcDeltaR4Test extends BaseJpaR4Test {
 	@AfterEach
 	public void after() {
 		myDaoConfig.setDeferIndexingForCodesystemsOfSize(new DaoConfig().getDeferIndexingForCodesystemsOfSize());
+		TermDeferredStorageSvcImpl termDeferredStorageSvc = AopTestUtils.getTargetObject(myTermDeferredStorageSvc);
+		termDeferredStorageSvc.clearDeferred();
 	}
-
 
 	@Test
 	public void testAddRootConcepts() {
@@ -396,8 +396,14 @@ public class TerminologySvcDeltaR4Test extends BaseJpaR4Test {
 		myTermCodeSystemStorageSvc.applyDeltaCodeSystemsAdd("http://foo/cs", delta);
 
 		assertFalse(myTermDeferredStorageSvc.isStorageQueueEmpty());
-		while (!myTermDeferredStorageSvc.isStorageQueueEmpty()) {
+		int counter = 0;
+		while (!myTermDeferredStorageSvc.isStorageQueueEmpty() && ++counter < 10000) {
 			myTermDeferredStorageSvc.saveDeferred();
+		}
+		if (counter >= 10000) {
+			ourLog.error("Failed to empty myTermDeferredStorageSvc storage queue after 10000 attempts");
+			myTermDeferredStorageSvc.logQueueForUnitTest();
+			fail("myTermDeferredStorageSvc.saveDeferred() did not empty myTermDeferredStorageSvc storage queue.");
 		}
 
 		List<String> expectedHierarchy = new ArrayList<>();
@@ -552,20 +558,27 @@ public class TerminologySvcDeltaR4Test extends BaseJpaR4Test {
 		assertEquals(true, runInTransaction(() -> myTermSvc.findCode("http://foo/cs", "codeAAA").isPresent()));
 
 		// Remove CodeA
+		runInTransaction(()->{
+			ourLog.info("About to remove CodeA. Have codes:\n * {}", myTermConceptDao.findAll().stream().map(t->t.toString()).collect(Collectors.joining("\n * ")));
+		});
+
+
 		myCaptureQueriesListener.clear();
 		runInTransaction(()->{
 			CustomTerminologySet delta2 = new CustomTerminologySet();
 			delta2.addRootConcept("codeA");
 			myTermCodeSystemStorageSvc.applyDeltaCodeSystemsRemove("http://foo/cs", delta2);
 		});
-		myCaptureQueriesListener.logAllQueriesForCurrentThread();
+		myCaptureQueriesListener.logAllQueries();
 
-		ourLog.info("*** Done removing");
+		runInTransaction(()->{
+			ourLog.info("Done removing. Have codes:\n * {}", myTermConceptDao.findAll().stream().map(t->t.toString()).collect(Collectors.joining("\n * ")));
+		});
 
 		assertEquals(false, runInTransaction(() -> myTermSvc.findCode("http://foo/cs", "codeB").isPresent()));
 		assertEquals(false, runInTransaction(() -> myTermSvc.findCode("http://foo/cs", "codeA").isPresent()));
-		assertEquals(false, runInTransaction(() -> myTermSvc.findCode("http://foo/cs", "codeAA").isPresent()));
-		assertEquals(false, runInTransaction(() -> myTermSvc.findCode("http://foo/cs", "codeAAA").isPresent()));
+		assertEquals(false, runInTransaction(() -> myTermSvc.findCode("http://foo/cs", "codeAA").isPresent())); //TODO GGG JA this assert fails. If you swap to `deleteByPid` it does not fail.
+		assertEquals(false, runInTransaction(() -> myTermSvc.findCode("http://foo/cs", "codeAAA").isPresent()));//And I assume this one does too.
 
 	}
 

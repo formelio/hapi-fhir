@@ -4,7 +4,7 @@ package ca.uhn.fhir.rest.server.interceptor.auth;
  * #%L
  * HAPI FHIR - Server Framework
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -344,6 +344,11 @@ public class AuthorizationInterceptor implements IRuleApplier {
 	public void hookCascadeDeleteForConflict(RequestDetails theRequestDetails, Pointcut thePointcut, IBaseResource theResourceToDelete) {
 		Validate.notNull(theResourceToDelete); // just in case
 		checkPointcutAndFailIfDeny(theRequestDetails, thePointcut, theResourceToDelete);
+	}
+
+	@Hook(Pointcut.STORAGE_PRE_DELETE_EXPUNGE)
+	public void hookDeleteExpunge(RequestDetails theRequestDetails, Pointcut thePointcut) {
+		applyRulesAndFailIfDeny(theRequestDetails.getRestOperationType(), theRequestDetails, null, null, null, thePointcut);
 	}
 
 	private void checkPointcutAndFailIfDeny(RequestDetails theRequestDetails, Pointcut thePointcut, @Nonnull IBaseResource theInputResource) {

@@ -4,7 +4,7 @@ package ca.uhn.fhir.jpa.dao.predicate;
  * #%L
  * HAPI FHIR JPA Server
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ package ca.uhn.fhir.jpa.dao.predicate;
  */
 
 import ca.uhn.fhir.interceptor.model.RequestPartitionId;
-import ca.uhn.fhir.jpa.dao.SearchBuilder;
+import ca.uhn.fhir.jpa.dao.LegacySearchBuilder;
 import ca.uhn.fhir.jpa.model.entity.ResourceTag;
 import ca.uhn.fhir.jpa.model.entity.TagDefinition;
 import ca.uhn.fhir.jpa.model.entity.TagTypeEnum;
@@ -50,10 +50,10 @@ import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 @Component
 @Scope("prototype")
-class PredicateBuilderTag extends BasePredicateBuilder {
+public class PredicateBuilderTag extends BasePredicateBuilder {
 	private static final Logger ourLog = LoggerFactory.getLogger(PredicateBuilderTag.class);
 
-	PredicateBuilderTag(SearchBuilder theSearchBuilder) {
+	public PredicateBuilderTag(LegacySearchBuilder theSearchBuilder) {
 		super(theSearchBuilder);
 	}
 

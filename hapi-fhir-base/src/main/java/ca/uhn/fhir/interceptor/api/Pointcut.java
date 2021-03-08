@@ -4,7 +4,7 @@ package ca.uhn.fhir.interceptor.api;
  * #%L
  * HAPI FHIR - Core Library
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import ca.uhn.fhir.rest.annotation.Read;
 import ca.uhn.fhir.rest.annotation.Search;
 import ca.uhn.fhir.rest.server.exceptions.AuthenticationException;
 import ca.uhn.fhir.rest.server.exceptions.BaseServerResponseException;
+import org.hl7.fhir.instance.model.api.IBaseConformance;
 
 import javax.annotation.Nonnull;
 import java.io.Writer;
@@ -48,7 +49,7 @@ import java.util.Set;
  * </ul>
  * </p>
  */
-public enum Pointcut {
+public enum Pointcut implements IPointcut {
 
 	/**
 	 * <b>Interceptor Framework Hook:</b>
@@ -101,6 +102,45 @@ public enum Pointcut {
 		"ca.uhn.fhir.rest.client.api.IHttpRequest",
 		"ca.uhn.fhir.rest.client.api.IHttpResponse",
 		"ca.uhn.fhir.rest.client.api.IRestfulClient"
+	),
+
+	/**
+	 * <b>Server Hook:</b>
+	 * This hook is called when a server CapabilityStatement is generated for returning to a client.
+	 * <p>
+	 * This pointcut will not necessarily be invoked for every client request to the `/metadata` endpoint.
+	 * If caching of the generated CapabilityStatement is enabled, a new CapabilityStatement will be
+	 * generated periodically and this pointcut will be invoked at that time.
+	 * </p>
+	 * <p>
+	 * Hooks may accept the following parameters:
+	 * <ul>
+	 * <li>
+	 * org.hl7.fhir.instance.model.api.IBaseConformance - The <code>CapabilityStatement</code> resource that will
+	 * be returned to the client by the server. Interceptors may make changes to this resource. The parameter
+	 * must be of type <code>IBaseConformance</code>, so it is the responsibility of the interceptor hook method
+	 * code to cast to the appropriate version.
+	 * </li>
+	 * <li>
+	 * ca.uhn.fhir.rest.api.server.RequestDetails - A bean containing details about the request that is about to
+	 * be processed
+	 * </li>
+	 * <li>
+	 * ca.uhn.fhir.rest.server.servlet.ServletRequestDetails - A bean containing details about the request that
+	 * is about to be processed. This parameter is identical to the RequestDetails parameter above but will only
+	 * be populated when operating in a RestfulServer implementation. It is provided as a convenience.
+	 * </li>
+	 * </ul>
+	 * </p>
+	 * Hook methods may an instance of a new <code>CapabilityStatement</code> resource which will replace the
+	 * one that was supplied to the interceptor, or <code>void</code> to use the original one. If the interceptor
+	 * chooses to modify the <code>CapabilityStatement</code> that was supplied to the interceptor, it is fine
+	 * for your hook method to return <code>void</code> or <code>null</code>.
+	 */
+	SERVER_CAPABILITY_STATEMENT_GENERATED(IBaseConformance.class,
+		"org.hl7.fhir.instance.model.api.IBaseConformance",
+		"ca.uhn.fhir.rest.api.server.RequestDetails",
+		"ca.uhn.fhir.rest.server.servlet.ServletRequestDetails"
 	),
 
 	/**
@@ -918,6 +958,95 @@ public enum Pointcut {
 
 	/**
 	 * <b>Storage Hook:</b>
+	 * Invoked when a set of resources are about to be deleted and expunged via url like http://localhost/Patient?active=false&_expunge=true
+	 * <p>
+	 * Hooks may accept the following parameters:
+	 * </p>
+	 * <ul>
+	 * <li>
+	 * ca.uhn.fhir.rest.api.server.RequestDetails - A bean containing details about the request that is about to be processed, including details such as the
+	 * resource type and logical ID (if any) and other FHIR-specific aspects of the request which have been
+	 * pulled out of the servlet request. Note that the bean
+	 * properties are not all guaranteed to be populated, depending on how early during processing the
+	 * exception occurred. <b>Note that this parameter may be null in contexts where the request is not
+	 * known, such as while processing searches</b>
+	 * </li>
+	 * <li>
+	 * ca.uhn.fhir.rest.server.servlet.ServletRequestDetails - A bean containing details about the request that is about to be processed, including details such as the
+	 * resource type and logical ID (if any) and other FHIR-specific aspects of the request which have been
+	 * pulled out of the servlet request. This parameter is identical to the RequestDetails parameter above but will
+	 * only be populated when operating in a RestfulServer implementation. It is provided as a convenience.
+	 * </li>
+	 * <li>
+	 * java.lang.String - Contains the url used to delete and expunge the resources
+	 * </li>
+	 * </ul>
+	 * <p>
+	 * Hooks should return <code>void</code>. They may choose to throw an exception however, in
+	 * which case the delete expunge will not occur.
+	 * </p>
+	 */
+
+	STORAGE_PRE_DELETE_EXPUNGE(
+		void.class,
+		"ca.uhn.fhir.rest.api.server.RequestDetails",
+		"ca.uhn.fhir.rest.server.servlet.ServletRequestDetails",
+		"java.lang.String"
+	),
+
+	/**
+	 * <b>Storage Hook:</b>
+	 * Invoked when a batch of resource pids are about to be deleted and expunged via url like http://localhost/Patient?active=false&_expunge=true
+	 * <p>
+	 * Hooks may accept the following parameters:
+	 * </p>
+	 * <ul>
+	 * <li>
+	 * java.lang.String - the name of the resource type being deleted
+	 * </li>
+	 * <li>
+	 * java.util.List - the list of Long pids of the resources about to be deleted
+	 * </li>
+	 * <li>
+	 * java.util.concurrent.atomic.AtomicLong - holds a running tally of all entities deleted so far.
+	 * If the pointcut callback deletes any entities, then this parameter should be incremented by the total number
+	 * of additional entities deleted.
+	 * </li>
+	 * <li>
+	 * ca.uhn.fhir.rest.api.server.RequestDetails - A bean containing details about the request that is about to be processed, including details such as the
+	 * resource type and logical ID (if any) and other FHIR-specific aspects of the request which have been
+	 * pulled out of the servlet request. Note that the bean
+	 * properties are not all guaranteed to be populated, depending on how early during processing the
+	 * exception occurred. <b>Note that this parameter may be null in contexts where the request is not
+	 * known, such as while processing searches</b>
+	 * </li>
+	 * <li>
+	 * ca.uhn.fhir.rest.server.servlet.ServletRequestDetails - A bean containing details about the request that is about to be processed, including details such as the
+	 * resource type and logical ID (if any) and other FHIR-specific aspects of the request which have been
+	 * pulled out of the servlet request. This parameter is identical to the RequestDetails parameter above but will
+	 * only be populated when operating in a RestfulServer implementation. It is provided as a convenience.
+	 * </li>
+	 * <li>
+	 * java.lang.String - Contains the url used to delete and expunge the resources
+	 * </li>
+	 * </ul>
+	 * <p>
+	 * Hooks should return <code>void</code>. They may choose to throw an exception however, in
+	 * which case the delete expunge will not occur.
+	 * </p>
+	 */
+
+	STORAGE_PRE_DELETE_EXPUNGE_PID_LIST(
+		void.class,
+		"java.lang.String",
+		"java.util.List",
+		"java.util.concurrent.atomic.AtomicLong",
+		"ca.uhn.fhir.rest.api.server.RequestDetails",
+		"ca.uhn.fhir.rest.server.servlet.ServletRequestDetails"
+	),
+
+	/**
+	 * <b>Storage Hook:</b>
 	 * Invoked when one or more resources may be returned to the user, whether as a part of a READ,
 	 * a SEARCH, or even as the response to a CREATE/UPDATE, etc.
 	 * <p>
@@ -1614,21 +1743,21 @@ public enum Pointcut {
 	),
 
 	/**
-	 * <b>EMPI Hook:</b>
-	 * Invoked whenever a persisted Patient/Practitioner resource (a resource that has just been stored in the
-	 * database via a create/update/patch/etc.) has been matched against related resources and EMPI links have been updated.
+	 * <b>MDM(EMPI) Hook:</b>
+	 * Invoked whenever a persisted resource (a resource that has just been stored in the
+	 * database via a create/update/patch/etc.) has been matched against related resources and MDM links have been updated.
 	 * <p>
 	 * Hooks may accept the following parameters:
 	 * <ul>
-	 * <li>ca.uhn.fhir.jpa.subscription.model.ResourceModifiedMessage - This parameter should not be modified as processing is complete when this hook is invoked.</li>
-	 * <li>ca.uhn.fhir.empi.model.TransactionLogMessages - This parameter is for informational messages provided by the EMPI module during EMPI procesing. .</li>
+	 * <li>ca.uhn.fhir.rest.server.messaging.ResourceOperationMessage - This parameter should not be modified as processing is complete when this hook is invoked.</li>
+	 * <li>ca.uhn.fhir.rest.server.TransactionLogMessages - This parameter is for informational messages provided by the MDM module during MDM processing.</li>
 	 * </ul>
 	 * </p>
 	 * <p>
 	 * Hooks should return <code>void</code>.
 	 * </p>
 	 */
-	EMPI_AFTER_PERSISTED_RESOURCE_CHECKED(void.class, "ca.uhn.fhir.jpa.subscription.model.ResourceModifiedMessage", "ca.uhn.fhir.rest.server.TransactionLogMessages"),
+	MDM_AFTER_PERSISTED_RESOURCE_CHECKED(void.class, "ca.uhn.fhir.rest.server.messaging.ResourceOperationMessage", "ca.uhn.fhir.rest.server.TransactionLogMessages"),
 
 	/**
 	 * <b>Performance Tracing Hook:</b>
@@ -2089,6 +2218,7 @@ public enum Pointcut {
 		this(theReturnType, new ExceptionHandlingSpec(), theParameterTypes);
 	}
 
+	@Override
 	public boolean isShouldLogAndSwallowException(@Nonnull Throwable theException) {
 		for (Class<? extends Throwable> next : myExceptionHandlingSpec.myTypesToLogAndSwallow) {
 			if (next.isAssignableFrom(theException.getClass())) {
@@ -2098,11 +2228,13 @@ public enum Pointcut {
 		return false;
 	}
 
+	@Override
 	@Nonnull
 	public Class<?> getReturnType() {
 		return myReturnType;
 	}
 
+	@Override
 	@Nonnull
 	public List<String> getParameterTypes() {
 		return myParameterTypes;

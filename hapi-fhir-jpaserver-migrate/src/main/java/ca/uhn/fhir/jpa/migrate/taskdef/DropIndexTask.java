@@ -4,7 +4,7 @@ package ca.uhn.fhir.jpa.migrate.taskdef;
  * #%L
  * HAPI FHIR JPA Server - Migration
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -86,8 +86,12 @@ public class DropIndexTask extends BaseTableTask {
 			@Language("SQL") String findConstraintSql = "SELECT DISTINCT constraint_name FROM user_cons_columns WHERE constraint_name = ? AND table_name = ?";
 			@Language("SQL") String dropConstraintSql = "ALTER TABLE " + getTableName() + " DROP CONSTRAINT ?";
 			findAndDropConstraint(findConstraintSql, dropConstraintSql);
-
 			findConstraintSql = "SELECT DISTINCT constraint_name FROM all_constraints WHERE index_name = ? AND table_name = ?";
+			findAndDropConstraint(findConstraintSql, dropConstraintSql);
+		} else if (getDriverType() == DriverTypeEnum.MSSQL_2012) {
+			// Legacy deletion for SQL Server unique indexes
+			@Language("SQL") String findConstraintSql = "SELECT tc.CONSTRAINT_NAME FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS AS tc WHERE tc.CONSTRAINT_NAME = ? AND tc.TABLE_NAME = ?";
+			@Language("SQL") String dropConstraintSql = "ALTER TABLE " + getTableName() + " DROP CONSTRAINT ?";
 			findAndDropConstraint(findConstraintSql, dropConstraintSql);
 		}
 

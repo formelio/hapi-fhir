@@ -4,7 +4,7 @@ package ca.uhn.fhir.jpa.provider.dstu3;
  * #%L
  * HAPI FHIR JPA Server
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -54,6 +54,8 @@ public class BaseJpaResourceProviderConceptMapDstu3 extends JpaResourceProviderD
 	public Parameters translate(
 		HttpServletRequest theServletRequest,
 		@IdParam(optional = true) IdType theId,
+		@OperationParam(name = "url", min = 0, max = 1) UriType theUrl,
+		@OperationParam(name = "conceptMapVersion", min = 0, max = 1) StringType theConceptMapVersion,
 		@OperationParam(name = "code", min = 0, max = 1) CodeType theSourceCode,
 		@OperationParam(name = "system", min = 0, max = 1) UriType theSourceCodeSystem,
 		@OperationParam(name = "version", min = 0, max = 1) StringType theSourceCodeSystemVersion,
@@ -65,6 +67,10 @@ public class BaseJpaResourceProviderConceptMapDstu3 extends JpaResourceProviderD
 		@OperationParam(name = "reverse", min = 0, max = 1) BooleanType theReverse,
 		RequestDetails theRequestDetails
 	) {
+		boolean haveUrl = theUrl != null
+			&& theUrl.hasValue();
+		boolean haveConceptMapVersion = theConceptMapVersion != null
+			&& theConceptMapVersion.hasValue();
 		boolean haveSourceCode = theSourceCode != null
 			&& theSourceCode.hasValue();
 		boolean haveSourceCodeSystem = theSourceCodeSystem != null
@@ -93,6 +99,15 @@ public class BaseJpaResourceProviderConceptMapDstu3 extends JpaResourceProviderD
 
 		TranslationRequest translationRequest = new TranslationRequest();
 		try {
+			
+			if (haveUrl) {
+				translationRequest.setUrl(VersionConvertor_30_40.convertUri(theUrl));
+			}
+			
+			if (haveConceptMapVersion) {
+				translationRequest.setConceptMapVersion(VersionConvertor_30_40.convertString(theConceptMapVersion));
+			}
+			
 			// Convert from DSTU3 to R4
 			if (haveSourceCode) {
 				translationRequest.getCodeableConcept().addCoding().setCodeElement(VersionConvertor_30_40.convertCode(theSourceCode));

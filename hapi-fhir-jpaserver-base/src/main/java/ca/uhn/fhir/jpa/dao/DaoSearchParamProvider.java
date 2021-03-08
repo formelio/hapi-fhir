@@ -4,7 +4,7 @@ package ca.uhn.fhir.jpa.dao;
  * #%L
  * HAPI FHIR JPA Server
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,11 +21,13 @@ package ca.uhn.fhir.jpa.dao;
  */
 
 import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
+import ca.uhn.fhir.jpa.api.dao.IFhirResourceDao;
 import ca.uhn.fhir.jpa.searchparam.SearchParameterMap;
 import ca.uhn.fhir.jpa.searchparam.registry.ISearchParamProvider;
-import ca.uhn.fhir.jpa.searchparam.registry.SearchParamRegistryImpl;
 import ca.uhn.fhir.model.dstu2.valueset.ResourceTypeEnum;
 import ca.uhn.fhir.rest.api.server.IBundleProvider;
+import org.hl7.fhir.instance.model.api.IBaseResource;
+import org.hl7.fhir.instance.model.api.IIdType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
@@ -39,11 +41,15 @@ public class DaoSearchParamProvider implements ISearchParamProvider {
 
 	@Override
 	public IBundleProvider search(SearchParameterMap theParams) {
-		return myDaoRegistry.getResourceDao(ResourceTypeEnum.SEARCHPARAMETER.getCode()).search(theParams);
+		return getSearchParamDao().search(theParams);
+	}
+
+	private IFhirResourceDao getSearchParamDao() {
+		return myDaoRegistry.getResourceDao(ResourceTypeEnum.SEARCHPARAMETER.getCode());
 	}
 
 	@Override
-	public int refreshCache(SearchParamRegistryImpl theSearchParamRegistry, long theRefreshInterval) {
-		return theSearchParamRegistry.doRefresh(theRefreshInterval);
+	public IBaseResource read(IIdType theSearchParamId) {
+		return getSearchParamDao().read(theSearchParamId);
 	}
 }

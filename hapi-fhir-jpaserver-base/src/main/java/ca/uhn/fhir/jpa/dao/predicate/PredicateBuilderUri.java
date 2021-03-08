@@ -4,7 +4,7 @@ package ca.uhn.fhir.jpa.dao.predicate;
  * #%L
  * HAPI FHIR JPA Server
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ package ca.uhn.fhir.jpa.dao.predicate;
 
 import ca.uhn.fhir.context.RuntimeSearchParam;
 import ca.uhn.fhir.interceptor.model.RequestPartitionId;
-import ca.uhn.fhir.jpa.dao.SearchBuilder;
+import ca.uhn.fhir.jpa.dao.LegacySearchBuilder;
 import ca.uhn.fhir.jpa.dao.data.IResourceIndexedSearchParamUriDao;
 import ca.uhn.fhir.jpa.model.entity.BaseResourceIndexedSearchParam;
 import ca.uhn.fhir.jpa.model.entity.ResourceIndexedSearchParamUri;
@@ -43,12 +43,12 @@ import java.util.List;
 
 @Component
 @Scope("prototype")
-class PredicateBuilderUri extends BasePredicateBuilder implements IPredicateBuilder {
+public class PredicateBuilderUri extends BasePredicateBuilder implements IPredicateBuilder {
 	private static final Logger ourLog = LoggerFactory.getLogger(PredicateBuilderUri.class);
 	@Autowired
 	private IResourceIndexedSearchParamUriDao myResourceIndexedSearchParamUriDao;
 
-	PredicateBuilderUri(SearchBuilder theSearchBuilder) {
+	public PredicateBuilderUri(LegacySearchBuilder theSearchBuilder) {
 		super(theSearchBuilder);
 	}
 

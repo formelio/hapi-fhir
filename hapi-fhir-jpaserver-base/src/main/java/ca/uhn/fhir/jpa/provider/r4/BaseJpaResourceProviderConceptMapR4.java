@@ -4,7 +4,7 @@ package ca.uhn.fhir.jpa.provider.r4;
  * #%L
  * HAPI FHIR JPA Server
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -49,6 +49,8 @@ public class BaseJpaResourceProviderConceptMapR4 extends JpaResourceProviderR4<C
 	public Parameters translate(
 		HttpServletRequest theServletRequest,
 		@IdParam(optional = true) IdType theId,
+		@OperationParam(name = "url", min = 0, max = 1) UriType theUrl,
+		@OperationParam(name = "conceptMapVersion", min = 0, max = 1) StringType theConceptMapVersion,
 		@OperationParam(name = "code", min = 0, max = 1) CodeType theSourceCode,
 		@OperationParam(name = "system", min = 0, max = 1) UriType theSourceCodeSystem,
 		@OperationParam(name = "version", min = 0, max = 1) StringType theSourceCodeSystemVersion,
@@ -60,6 +62,10 @@ public class BaseJpaResourceProviderConceptMapR4 extends JpaResourceProviderR4<C
 		@OperationParam(name = "reverse", min = 0, max = 1) BooleanType theReverse,
 		RequestDetails theRequestDetails
 	) {
+		boolean haveUrl = theUrl != null
+			&& theUrl.hasValue();
+		boolean haveConceptMapVersion = theConceptMapVersion != null
+				&& theConceptMapVersion.hasValue();
 		boolean haveSourceCode = theSourceCode != null
 			&& theSourceCode.hasCode();
 		boolean haveSourceCodeSystem = theSourceCodeSystem != null
@@ -88,6 +94,14 @@ public class BaseJpaResourceProviderConceptMapR4 extends JpaResourceProviderR4<C
 
 		TranslationRequest translationRequest = new TranslationRequest();
 
+		if (haveUrl) {
+			translationRequest.setUrl(theUrl);
+		}
+		
+		if (haveConceptMapVersion) {
+			translationRequest.setConceptMapVersion(theConceptMapVersion);
+		}
+		
 		if (haveSourceCode) {
 			translationRequest.getCodeableConcept().addCoding().setCodeElement(theSourceCode);
 

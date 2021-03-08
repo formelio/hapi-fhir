@@ -12,6 +12,8 @@ import ca.uhn.fhir.jpa.provider.GraphQLProvider;
 import ca.uhn.fhir.jpa.term.TermLoaderSvcImpl;
 import ca.uhn.fhir.jpa.term.TermReadSvcDstu3;
 import ca.uhn.fhir.jpa.term.TermVersionAdapterSvcDstu3;
+import ca.uhn.fhir.jpa.term.api.ITermCodeSystemStorageSvc;
+import ca.uhn.fhir.jpa.term.api.ITermDeferredStorageSvc;
 import ca.uhn.fhir.jpa.term.api.ITermLoaderSvc;
 import ca.uhn.fhir.jpa.term.api.ITermReadSvcDstu3;
 import ca.uhn.fhir.jpa.term.api.ITermVersionAdapterSvc;
@@ -29,7 +31,7 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
  * #%L
  * HAPI FHIR JPA Server
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -49,6 +51,8 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 @EnableTransactionManagement
 public class BaseDstu3Config extends BaseConfigDstu3Plus {
 
+	public static FhirContext ourFhirContext = FhirContext.forDstu3();
+
 	@Override
 	public FhirContext fhirContext() {
 		return fhirContextDstu3();
@@ -63,7 +67,7 @@ public class BaseDstu3Config extends BaseConfigDstu3Plus {
 	@Bean
 	@Primary
 	public FhirContext fhirContextDstu3() {
-		FhirContext retVal = FhirContext.forDstu3();
+		FhirContext retVal = ourFhirContext;
 
 		// Don't strip versions in some places
 		ParserOptions parserOptions = retVal.getParserOptions();
@@ -114,8 +118,8 @@ public class BaseDstu3Config extends BaseConfigDstu3Plus {
 	}
 
 	@Bean
-	public ITermLoaderSvc termLoaderService() {
-		return new TermLoaderSvcImpl();
+	public ITermLoaderSvc termLoaderService(ITermDeferredStorageSvc theDeferredStorageSvc, ITermCodeSystemStorageSvc theCodeSystemStorageSvc) {
+		return new TermLoaderSvcImpl(theDeferredStorageSvc, theCodeSystemStorageSvc);
 	}
 
 	@Override

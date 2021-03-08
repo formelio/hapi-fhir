@@ -4,7 +4,7 @@ package ca.uhn.fhir.jpa.migrate.taskdef;
  * #%L
  * HAPI FHIR JPA Server - Migration
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -58,6 +58,14 @@ public abstract class BaseTask {
 	protected BaseTask(String theProductVersion, String theSchemaVersion) {
 		myProductVersion = theProductVersion;
 		mySchemaVersion = theSchemaVersion;
+	}
+
+	public String getProductVersion() {
+		return myProductVersion;
+	}
+
+	public String getSchemaVersion() {
+		return mySchemaVersion;
 	}
 
 	public boolean isNoColumnShrink() {
@@ -137,16 +145,18 @@ public abstract class BaseTask {
 		return myConnectionProperties;
 	}
 
-	public void setConnectionProperties(DriverTypeEnum.ConnectionProperties theConnectionProperties) {
+	public BaseTask setConnectionProperties(DriverTypeEnum.ConnectionProperties theConnectionProperties) {
 		myConnectionProperties = theConnectionProperties;
+		return this;
 	}
 
 	public DriverTypeEnum getDriverType() {
 		return myDriverType;
 	}
 
-	public void setDriverType(DriverTypeEnum theDriverType) {
+	public BaseTask setDriverType(DriverTypeEnum theDriverType) {
 		myDriverType = theDriverType;
+		return this;
 	}
 
 	public abstract void validate();

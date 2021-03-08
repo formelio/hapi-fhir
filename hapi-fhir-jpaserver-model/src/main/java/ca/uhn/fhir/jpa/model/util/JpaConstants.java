@@ -2,9 +2,9 @@ package ca.uhn.fhir.jpa.model.util;
 
 /*-
  * #%L
- * HAPI FHIR Model
+ * HAPI FHIR JPA Model
  * %%
- * Copyright (C) 2014 - 2020 University Health Network
+ * Copyright (C) 2014 - 2021 Smile CDR, Inc.
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -102,10 +102,6 @@ public class JpaConstants {
 	// NB don't delete this, it's used in Smile as well, even though hapi-fhir-server uses the version from Constants.java
 	public static final String OPERATION_VALIDATE = Constants.EXTOP_VALIDATE;
 	/**
-	 * Operation name for the $suggest-keywords operation
-	 */
-	public static final String OPERATION_SUGGEST_KEYWORDS = "$suggest-keywords";
-	/**
 	 * Operation name for the $everything operation
 	 */
 	public static final String OPERATION_EVERYTHING = "$everything";
@@ -186,6 +182,13 @@ public class JpaConstants {
 	 * Parameter for the $export operation
 	 */
 	public static final String PARAM_EXPORT_TYPE_FILTER = "_typeFilter";
+
+	/**
+	 * Parameter for delete to indicate the deleted resources should also be expunged
+	 */
+
+	public static final String PARAM_DELETE_EXPUNGE = "_expunge";
+
 	/**
 	 * URL for extension on a SearchParameter indicating that text values should not be indexed
 	 */
@@ -195,6 +198,12 @@ public class JpaConstants {
 	 * URL for extension on a Phonetic String SearchParameter indicating that text values should be phonetically indexed with the named encoder
 	 */
 	public static final String EXT_SEARCHPARAM_PHONETIC_ENCODER = "http://hapifhir.io/fhir/StructureDefinition/searchparameter-phonetic-encoder";
+	public static final String VALUESET_FILTER_DISPLAY = "display";
+
+	/**
+	 * The name of the default partition
+	 */
+	public static final String DEFAULT_PARTITION_NAME = "DEFAULT";
 
 	/**
 	 * Non-instantiable
