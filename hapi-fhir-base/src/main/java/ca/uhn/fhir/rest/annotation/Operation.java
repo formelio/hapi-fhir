@@ -139,4 +139,9 @@ public @interface Operation {
 	 */
 	boolean global() default false;
 
+	/**
+	 * If specified, this is the ID of the tenant that the search is for.
+	 */
+	String tenantId() default "";
+
 }

@@ -40,6 +40,7 @@ import ca.uhn.fhir.rest.server.exceptions.BaseServerResponseException;
 import ca.uhn.fhir.rest.server.exceptions.MethodNotAllowedException;
 import ca.uhn.fhir.rest.server.interceptor.IServerInterceptor.ActionRequestDetails;
 import ca.uhn.fhir.util.ParametersUtil;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import org.hl7.fhir.instance.model.api.IBase;
@@ -75,6 +76,7 @@ public class OperationMethodBinding extends BaseResourceReturningMethodBinding {
 	private List<ReturnType> myReturnParams;
 	private boolean myManualRequestMode;
 	private boolean myManualResponseMode;
+	private final String myTenantId;
 
 	/**
 	 * Constructor - This is the constructor that is called when binding a
@@ -92,8 +94,16 @@ public class OperationMethodBinding extends BaseResourceReturningMethodBinding {
 	protected OperationMethodBinding(Class<?> theReturnResourceType, Class<? extends IBaseResource> theReturnTypeFromRp, Method theMethod, FhirContext theContext, Object theProvider,
 												boolean theIdempotent, String theOperationName, Class<? extends IBaseResource> theOperationType, String theOperationTypeName,
 												OperationParam[] theReturnParams, BundleTypeEnum theBundleType, boolean theGlobal) {
+		this(theReturnResourceType, theReturnTypeFromRp, theMethod, theContext, theProvider, theIdempotent, theOperationName, theOperationType, theOperationTypeName,
+			theReturnParams, theBundleType, theGlobal, "");
+	}
+
+	protected OperationMethodBinding(Class<?> theReturnResourceType, Class<? extends IBaseResource> theReturnTypeFromRp, Method theMethod, FhirContext theContext, Object theProvider,
+												boolean theIdempotent, String theOperationName, Class<? extends IBaseResource> theOperationType, String theOperationTypeName,
+												OperationParam[] theReturnParams, BundleTypeEnum theBundleType, boolean theGlobal, String theTenantId) {
 		super(theReturnResourceType, theMethod, theContext, theProvider);
 
+		myTenantId = theTenantId;
 		myBundleType = theBundleType;
 		myIdempotent = theIdempotent;
 		myDescription = ParametersUtil.extractDescription(theMethod);
@@ -182,7 +192,6 @@ public class OperationMethodBinding extends BaseResourceReturningMethodBinding {
 		if (myCanOperateAtInstanceLevel && !isGlobalMethod() && getResourceName() == null) {
 			throw new ConfigurationException(Msg.code(425) + "@" + Operation.class.getSimpleName() + " method is an instance level method (it has an @" + IdParam.class.getSimpleName() + " parameter) but is not marked as global() and is not declared in a resource provider: " + theMethod.getName());
 		}
-
 	}
 
 	public String getShortDescription() {
@@ -241,6 +250,10 @@ public class OperationMethodBinding extends BaseResourceReturningMethodBinding {
 			}
 		}
 
+		if (!StringUtils.equals(myTenantId, theRequest.getTenantId())) {
+			return MethodMatchEnum.NONE;
+		}
+
 		if (getResourceName() == null) {
 			if (isNotBlank(theRequest.getResourceName())) {
 				if (!isGlobalMethod()) {
@@ -266,6 +279,9 @@ public class OperationMethodBinding extends BaseResourceReturningMethodBinding {
 		if (isNotBlank(theRequest.getResourceName())) {
 			return myCanOperateAtTypeLevel ? MethodMatchEnum.EXACT : MethodMatchEnum.NONE;
 		}
+
+
+
 		return myCanOperateAtServerLevel ? MethodMatchEnum.EXACT : MethodMatchEnum.NONE;
 	}
 
