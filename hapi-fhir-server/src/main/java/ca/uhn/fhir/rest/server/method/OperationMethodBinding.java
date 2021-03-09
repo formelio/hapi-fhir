@@ -101,6 +101,7 @@ public class OperationMethodBinding extends BaseResourceReturningMethodBinding {
 	protected OperationMethodBinding(Class<?> theReturnResourceType, Class<? extends IBaseResource> theReturnTypeFromRp, Method theMethod, FhirContext theContext, Object theProvider,
 												boolean theIdempotent, String theOperationName, Class<? extends IBaseResource> theOperationType, String theOperationTypeName,
 												OperationParam[] theReturnParams, BundleTypeEnum theBundleType, boolean theGlobal, String theTenantId) {
+
 		super(theReturnResourceType, theMethod, theContext, theProvider);
 
 		myTenantId = theTenantId;
