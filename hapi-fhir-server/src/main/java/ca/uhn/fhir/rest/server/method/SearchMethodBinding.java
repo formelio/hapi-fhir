@@ -69,7 +69,7 @@ public class SearchMethodBinding extends BaseResourceReturningMethodBinding {
 	private final List<String> myRequiredParamNames;
 	private final List<String> myOptionalParamNames;
 	private final String myCompartmentName;
-    private final String myTenantId;
+	private final String myTenantId;
 	private String myDescription;
 	private final Integer myIdParamIndex;
 	private final String myQueryName;
@@ -80,7 +80,7 @@ public class SearchMethodBinding extends BaseResourceReturningMethodBinding {
 		Search search = theMethod.getAnnotation(Search.class);
 		this.myQueryName = StringUtils.defaultIfBlank(search.queryName(), null);
 		this.myCompartmentName = StringUtils.defaultIfBlank(search.compartmentName(), null);
-        this.myTenantId = StringUtils.defaultIfBlank(search.tenantId(), null);
+		this.myTenantId = StringUtils.defaultIfBlank(search.tenantId(), null);
 		this.myIdParamIndex = ParameterUtil.findIdParameterIndex(theMethod, getContext());
 		this.myAllowUnknownParams = search.allowUnknownParams();
 		this.myDescription = ParametersUtil.extractDescription(theMethod);
