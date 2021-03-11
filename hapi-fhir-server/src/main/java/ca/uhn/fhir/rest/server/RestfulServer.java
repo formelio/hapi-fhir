@@ -1074,6 +1074,10 @@ public class RestfulServer extends HttpServlet implements IRestfulServer<Servlet
 				return;
 			}
 
+			// Redetermine the resource method to allow the interceptors to influence it
+			resourceMethod = determineResourceMethod(requestDetails, requestPath);
+			ourLog.trace("Determined resource method {} for incoming request", resourceMethod.getMethod().toString());
+
 			/*
 			 * Actually invoke the server method. This call is to a HAPI method binding, which
 			 * is an object that wraps a specific implementing (user-supplied) method, but
