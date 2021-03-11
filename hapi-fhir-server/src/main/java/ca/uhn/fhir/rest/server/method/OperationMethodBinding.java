@@ -39,6 +39,7 @@ import ca.uhn.fhir.rest.param.ParameterUtil;
 import ca.uhn.fhir.rest.server.exceptions.BaseServerResponseException;
 import ca.uhn.fhir.rest.server.exceptions.MethodNotAllowedException;
 import ca.uhn.fhir.rest.server.interceptor.IServerInterceptor.ActionRequestDetails;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import org.hl7.fhir.instance.model.api.IBase;
@@ -73,12 +74,21 @@ public class OperationMethodBinding extends BaseResourceReturningMethodBinding {
 	private List<ReturnType> myReturnParams;
 	private boolean myManualRequestMode;
 	private boolean myManualResponseMode;
+	private final String myTenantId;
 
 	protected OperationMethodBinding(Class<?> theReturnResourceType, Class<? extends IBaseResource> theReturnTypeFromRp, Method theMethod, FhirContext theContext, Object theProvider,
 												boolean theIdempotent, String theOperationName, Class<? extends IBaseResource> theOperationType, String theOperationTypeName,
 												OperationParam[] theReturnParams, BundleTypeEnum theBundleType) {
+		this(theReturnResourceType, theReturnTypeFromRp, theMethod, theContext, theProvider, theIdempotent, theOperationName, theOperationType, theOperationTypeName,
+			theReturnParams, theBundleType, "");
+	}
+
+	protected OperationMethodBinding(Class<?> theReturnResourceType, Class<? extends IBaseResource> theReturnTypeFromRp, Method theMethod, FhirContext theContext, Object theProvider,
+												boolean theIdempotent, String theOperationName, Class<? extends IBaseResource> theOperationType, String theOperationTypeName,
+												OperationParam[] theReturnParams, BundleTypeEnum theBundleType, String theTenantId) {
 		super(theReturnResourceType, theMethod, theContext, theProvider);
 
+		myTenantId = theTenantId;
 		myBundleType = theBundleType;
 		myIdempotent = theIdempotent;
 
@@ -178,7 +188,7 @@ public class OperationMethodBinding extends BaseResourceReturningMethodBinding {
 	public OperationMethodBinding(Class<?> theReturnResourceType, Class<? extends IBaseResource> theReturnTypeFromRp, Method theMethod, FhirContext theContext, Object theProvider,
 											Operation theAnnotation) {
 		this(theReturnResourceType, theReturnTypeFromRp, theMethod, theContext, theProvider, theAnnotation.idempotent(), theAnnotation.name(), theAnnotation.type(), theAnnotation.typeName(), theAnnotation.returnParameters(),
-			theAnnotation.bundleType());
+			theAnnotation.bundleType(), theAnnotation.tenantId());
 
 		myManualRequestMode = theAnnotation.manualRequest();
 		myManualResponseMode = theAnnotation.manualResponse();
@@ -237,6 +247,10 @@ public class OperationMethodBinding extends BaseResourceReturningMethodBinding {
 			}
 		}
 
+		if (!StringUtils.equals(myTenantId, theRequest.getTenantId())) {
+			return MethodMatchEnum.NONE;
+		}
+
 		if (getResourceName() == null) {
 			if (isNotBlank(theRequest.getResourceName())) {
 				if (!isGlobalMethod()) {
@@ -262,6 +276,9 @@ public class OperationMethodBinding extends BaseResourceReturningMethodBinding {
 		if (isNotBlank(theRequest.getResourceName())) {
 			return myCanOperateAtTypeLevel ? MethodMatchEnum.EXACT : MethodMatchEnum.NONE;
 		}
+
+
+
 		return myCanOperateAtServerLevel ? MethodMatchEnum.EXACT : MethodMatchEnum.NONE;
 	}
 
