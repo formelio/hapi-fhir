@@ -58,6 +58,7 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 public class OperationMethodBinding extends BaseResourceReturningMethodBinding {
+	private static final org.slf4j.Logger ourLog = org.slf4j.LoggerFactory.getLogger(OperationMethodBinding.class);
 
 	public static final String WILDCARD_NAME = "$" + Operation.NAME_MATCH_ALL;
 	private final boolean myIdempotent;
@@ -88,7 +89,7 @@ public class OperationMethodBinding extends BaseResourceReturningMethodBinding {
 												OperationParam[] theReturnParams, BundleTypeEnum theBundleType, String theTenantId) {
 		super(theReturnResourceType, theMethod, theContext, theProvider);
 
-		myTenantId = theTenantId;
+		myTenantId = StringUtils.defaultIfBlank(theTenantId, null);
 		myBundleType = theBundleType;
 		myIdempotent = theIdempotent;
 
@@ -238,34 +239,40 @@ public class OperationMethodBinding extends BaseResourceReturningMethodBinding {
 	@Override
 	public MethodMatchEnum incomingServerRequestMatchesMethod(RequestDetails theRequest) {
 		if (isBlank(theRequest.getOperation())) {
+			ourLog.trace("Method {} does not match because the operation name is empty", getMethod());
 			return MethodMatchEnum.NONE;
 		}
 
 		if (!myName.equals(theRequest.getOperation())) {
 			if (!myName.equals(WILDCARD_NAME)) {
+				ourLog.trace("Method {} does not match because request is for method named {}", theRequest.getOperation(), myName);
 				return MethodMatchEnum.NONE;
 			}
 		}
 
 		if (!StringUtils.equals(myTenantId, theRequest.getTenantId())) {
+			ourLog.trace("Method {} does not match because it is for tenant {} and request is for tenant {}", getMethod(), myTenantId, theRequest.getTenantId());
 			return MethodMatchEnum.NONE;
 		}
 
 		if (getResourceName() == null) {
 			if (isNotBlank(theRequest.getResourceName())) {
 				if (!isGlobalMethod()) {
+					ourLog.trace("Method {} does not match because it is not a global method and an empty resource type was provided: {}", getMethod(), theRequest.getResourceName());
 					return MethodMatchEnum.NONE;
 				}
 			}
 		}
 
 		if (getResourceName() != null && !getResourceName().equals(theRequest.getResourceName())) {
+			ourLog.trace("Method {} does not match because expected type {} does not match requested type {}", getMethod(), getResourceName(), theRequest.getResourceName());
 			return MethodMatchEnum.NONE;
 		}
 
 		RequestTypeEnum requestType = theRequest.getRequestType();
 		if (requestType != RequestTypeEnum.GET && requestType != RequestTypeEnum.POST) {
 			// Operations can only be invoked with GET and POST
+			ourLog.trace("Method {} does not match because it can only be request with GET or POST, instead {} was provided", getMethod(), theRequest.getRequestType());
 			return MethodMatchEnum.NONE;
 		}
 
@@ -276,8 +283,6 @@ public class OperationMethodBinding extends BaseResourceReturningMethodBinding {
 		if (isNotBlank(theRequest.getResourceName())) {
 			return myCanOperateAtTypeLevel ? MethodMatchEnum.EXACT : MethodMatchEnum.NONE;
 		}
-
-
 
 		return myCanOperateAtServerLevel ? MethodMatchEnum.EXACT : MethodMatchEnum.NONE;
 	}
