@@ -245,7 +245,7 @@ public class OperationMethodBinding extends BaseResourceReturningMethodBinding {
 
 		if (!myName.equals(theRequest.getOperation())) {
 			if (!myName.equals(WILDCARD_NAME)) {
-				ourLog.trace("Method {} does not match because request is for method named {}", theRequest.getOperation(), myName);
+				ourLog.trace("Method {} does not match because request is for method named {}", myName, theRequest.getOperation());
 				return MethodMatchEnum.NONE;
 			}
 		}
