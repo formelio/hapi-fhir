@@ -371,8 +371,8 @@ public class RestfulServer extends HttpServlet implements IRestfulServer<Servlet
 	 * the given request
 	 */
 	public BaseMethodBinding<?> determineResourceMethod(RequestDetails requestDetails, String requestPath) {
-               return determineResourceMethod(requestDetails, requestPath, true);
-        }	
+		return determineResourceMethod(requestDetails, requestPath, true);
+	}
 
 	public BaseMethodBinding<?> determineResourceMethod(RequestDetails requestDetails, String requestPath, boolean throwUnknownOperationException) {
 		RequestTypeEnum requestType = requestDetails.getRequestType();
@@ -405,7 +405,7 @@ public class RestfulServer extends HttpServlet implements IRestfulServer<Servlet
 			}
 
 			if (throwUnknownOperationException) {
-			    throwUnknownFhirOperationException(requestDetails, requestPath, requestType);
+				throwUnknownFhirOperationException(requestDetails, requestPath, requestType);
 			}
 		}
 		return resourceMethod;
@@ -1135,16 +1135,15 @@ public class RestfulServer extends HttpServlet implements IRestfulServer<Servlet
 			// Prevent throwing an exception in this first request
 			BaseMethodBinding<?> resourceMethod = determineResourceMethod(requestDetails, requestPath, false);
 
-			// Super hacky fix for our use-case with system level operations, where we
-			// pretend that the request is always an operation if we can't find a resource
-			// method the first time.
+			// Super hacky fix for our use-case with system level operations, where we pretend that the request
+			// is always an operation if we can't find a resource method the first time.
 			// TODO Find something better
-		        RestOperationTypeEnum operation;
+			RestOperationTypeEnum operation;
 			if (resourceMethod == null) {
-                            operation = RestOperationTypeEnum.EXTENDED_OPERATION_SERVER;
+				operation = RestOperationTypeEnum.EXTENDED_OPERATION_SERVER;
 			}
 			else {
-                            operation = resourceMethod.getRestOperationType(requestDetails);
+				operation = resourceMethod.getRestOperationType(requestDetails);
 			}
 
 			requestDetails.setRestOperationType(operation);
@@ -1167,7 +1166,6 @@ public class RestfulServer extends HttpServlet implements IRestfulServer<Servlet
 
 			// Also redetermine the RestOperation type, cause we might have just spoiled it with our hack
 			requestDetails.setRestOperationType(resourceMethod.getRestOperationType(requestDetails));
-
 
 			/*
 			 * Actually invoke the server method. This call is to a HAPI method binding, which
