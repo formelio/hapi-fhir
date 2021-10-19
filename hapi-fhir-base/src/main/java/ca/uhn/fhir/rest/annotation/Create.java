@@ -46,7 +46,6 @@ public @interface Create {
 	// NB: Read, Search (maybe others) share this annotation, so update the javadocs everywhere
 	Class<? extends IBaseResource> type() default IBaseResource.class;
 
-
 	/**
 	 * This method allows the return type for this method to be specified in a
 	 * non-type-specific way, using the text name of the resource, e.g. "Patient".
@@ -56,4 +55,9 @@ public @interface Create {
 	 * @since 5.4.0
 	 */
 	String typeName() default "";
+
+	/**
+	 * If specified, this is the ID of the tenant that the search is for.
+	 */
+	String tenantId() default "";
 }
