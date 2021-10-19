@@ -45,6 +45,11 @@ public @interface Create {
 	 */
 	// NB: Read, Search (maybe others) share this annotation, so update the javadocs everywhere
 	Class<? extends IBaseResource> type() default IBaseResource.class;
+
+	/**
+	 * If specified, this is the ID of the tenant that the search is for.
+	 */
+	String tenantId() default "";
 	
 
 }
