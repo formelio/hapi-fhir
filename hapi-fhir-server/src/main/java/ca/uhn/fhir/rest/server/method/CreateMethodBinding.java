@@ -27,6 +27,8 @@ import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.Set;
 
+import ca.uhn.fhir.rest.api.server.RequestDetails;
+import org.apache.commons.lang3.StringUtils;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.instance.model.api.IIdType;
 
@@ -41,8 +43,12 @@ import javax.annotation.Nonnull;
 
 public class CreateMethodBinding extends BaseOutcomeReturningMethodBindingWithResourceParam {
 
+	private final String myTenantId;
+
 	public CreateMethodBinding(Method theMethod, FhirContext theContext, Object theProvider) {
 		super(theMethod, theContext, Create.class, theProvider);
+		Create create = theMethod.getAnnotation(Create.class);
+		this.myTenantId = StringUtils.defaultIfBlank(create.tenantId(), null);
 	}
 
 	@Override
@@ -59,6 +65,15 @@ public class CreateMethodBinding extends BaseOutcomeReturningMethodBindingWithRe
 	@Override
 	protected Set<RequestTypeEnum> provideAllowableRequestTypes() {
 		return Collections.singleton(RequestTypeEnum.POST);
+	}
+
+	@Override
+	public MethodMatchEnum incomingServerRequestMatchesMethod(RequestDetails theRequest) {
+		if (!StringUtils.equals(myTenantId, theRequest.getTenantId())) {
+			ourLog.trace("Method {} doesn't match because it is for tenant {} but request is for tenant {}", getMethod(), myTenantId, theRequest.getTenantId());
+			return MethodMatchEnum.NONE;
+		}
+		return super.incomingServerRequestMatchesMethod(theRequest);
 	}
 
 	@Override
