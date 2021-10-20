@@ -31,5 +31,8 @@ import java.lang.annotation.*;
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
 public @interface Transaction {
-	// nothing
+	/**
+	 * If specified, this is the ID of the tenant that the search is for.
+	 */
+	String tenantId() default "";
 }
