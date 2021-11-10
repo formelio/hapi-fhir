@@ -10,7 +10,7 @@
 
 	<groupId>nl.hinq.fhir</groupId>
 	<artifactId>hapi-fhir-base</artifactId>
-	<version>5.3.0</version>
+	<version>5.4.2</version>
 	<packaging>bundle</packaging>
 
 	<url>http://jamesagnew.github.io/hapi-fhir/</url>
