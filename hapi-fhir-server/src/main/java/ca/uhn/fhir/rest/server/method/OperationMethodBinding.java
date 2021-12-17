@@ -86,7 +86,7 @@ public class OperationMethodBinding extends BaseResourceReturningMethodBinding {
 	public OperationMethodBinding(Class<?> theReturnResourceType, Class<? extends IBaseResource> theReturnTypeFromRp, Method theMethod, FhirContext theContext, Object theProvider,
 											Operation theAnnotation) {
 		this(theReturnResourceType, theReturnTypeFromRp, theMethod, theContext, theProvider, theAnnotation.idempotent(), theAnnotation.name(), theAnnotation.type(), theAnnotation.typeName(), theAnnotation.returnParameters(),
-			theAnnotation.bundleType(), theAnnotation.global());
+			theAnnotation.bundleType(), theAnnotation.global(), theAnnotation.tenantId());
 
 		myManualRequestMode = theAnnotation.manualRequest();
 		myManualResponseMode = theAnnotation.manualResponse();
