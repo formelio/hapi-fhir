@@ -188,7 +188,7 @@ public class SearchParameterMap implements Serializable {
 		list.sort(new IncludeComparator());
 		for (Include nextInclude : list) {
 			addUrlParamSeparator(b);
-			b.append(paramName);
+			b.append(nextInclude.isRecurse() ? paramName + Constants.PARAM_INCLUDE_QUALIFIER_RECURSE : paramName);
 			b.append('=');
 			b.append(UrlUtil.escapeUrlParam(nextInclude.getParamType()));
 			b.append(':');
@@ -468,10 +468,7 @@ public class SearchParameterMap implements Serializable {
 		}
 
 		if (hasIncludes()) {
-			addUrlIncludeParams(b, Constants.PARAM_INCLUDE,
-				getIncludes().stream().filter(include -> !include.isRecurse()).collect(Collectors.toSet()));
-			addUrlIncludeParams(b, Constants.PARAM_INCLUDE_RECURSE,
-				getIncludes().stream().filter(Include::isRecurse).collect(Collectors.toSet()));
+			addUrlIncludeParams(b, Constants.PARAM_INCLUDE, getIncludes());
 		}
 		addUrlIncludeParams(b, Constants.PARAM_REVINCLUDE, getRevIncludes());
 
