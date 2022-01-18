@@ -188,7 +188,7 @@ public class SearchParameterMap implements Serializable {
 		list.sort(new IncludeComparator());
 		for (Include nextInclude : list) {
 			addUrlParamSeparator(b);
-			b.append(paramName);
+			b.append(nextInclude.isRecurse() ? paramName + Constants.PARAM_INCLUDE_QUALIFIER_RECURSE : paramName);
 			b.append('=');
 			b.append(UrlUtil.escapeUrlParam(nextInclude.getParamType()));
 			b.append(':');
