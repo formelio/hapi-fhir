@@ -10,7 +10,7 @@
 
 	<groupId>nl.hinq.fhir</groupId>
 	<artifactId>hapi-fhir-base</artifactId>
-	<version>5.4.2</version>
+	<version>5.7.9</version>
 	<packaging>bundle</packaging>
 
 	<url>http://jamesagnew.github.io/hapi-fhir/</url>
@@ -68,7 +68,7 @@
 			<optional>true</optional>
 		</dependency>
 
-		<!-- <dependency> <groupId>xerces</groupId> <artifactId>xercesImpl</artifactId> 
+		<!-- <dependency> <groupId>xerces</groupId> <artifactId>xercesImpl</artifactId>
 			<version>2.11.0</version> <optional>true</optional> </dependency> -->
 
 		<!-- General -->

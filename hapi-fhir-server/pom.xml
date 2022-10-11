@@ -10,7 +10,7 @@
 
 	<groupId>nl.hinq.fhir</groupId>
 	<artifactId>hapi-fhir-server</artifactId>
-	<version>5.4.2</version>
+	<version>5.7.9</version>
 	<packaging>bundle</packaging>
 
 	<name>HAPI FHIR - Server Framework</name>
@@ -44,7 +44,7 @@
 			<artifactId>httpcore</artifactId>
 		</dependency>
 
-		<!-- 
+		<!--
 		Spring is added as an optional dependency just so that it
 		can be used for CORS
 		-->
