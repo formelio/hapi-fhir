@@ -40,6 +40,7 @@ import ca.uhn.fhir.rest.server.exceptions.BaseServerResponseException;
 import ca.uhn.fhir.rest.server.exceptions.MethodNotAllowedException;
 import ca.uhn.fhir.rest.server.interceptor.IServerInterceptor.ActionRequestDetails;
 import ca.uhn.fhir.util.ParametersUtil;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import org.hl7.fhir.instance.model.api.IBase;
@@ -58,6 +59,7 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 public class OperationMethodBinding extends BaseResourceReturningMethodBinding {
+	private static final org.slf4j.Logger ourLog = org.slf4j.LoggerFactory.getLogger(OperationMethodBinding.class);
 
 	public static final String WILDCARD_NAME = "$" + Operation.NAME_MATCH_ALL;
 	private final boolean myIdempotent;
@@ -75,6 +77,7 @@ public class OperationMethodBinding extends BaseResourceReturningMethodBinding {
 	private List<ReturnType> myReturnParams;
 	private boolean myManualRequestMode;
 	private boolean myManualResponseMode;
+	private final String myTenantId;
 
 	/**
 	 * Constructor - This is the constructor that is called when binding a
@@ -83,7 +86,7 @@ public class OperationMethodBinding extends BaseResourceReturningMethodBinding {
 	public OperationMethodBinding(Class<?> theReturnResourceType, Class<? extends IBaseResource> theReturnTypeFromRp, Method theMethod, FhirContext theContext, Object theProvider,
 											Operation theAnnotation) {
 		this(theReturnResourceType, theReturnTypeFromRp, theMethod, theContext, theProvider, theAnnotation.idempotent(), theAnnotation.name(), theAnnotation.type(), theAnnotation.typeName(), theAnnotation.returnParameters(),
-			theAnnotation.bundleType(), theAnnotation.global());
+			theAnnotation.bundleType(), theAnnotation.global(), theAnnotation.tenantId());
 
 		myManualRequestMode = theAnnotation.manualRequest();
 		myManualResponseMode = theAnnotation.manualResponse();
@@ -92,8 +95,17 @@ public class OperationMethodBinding extends BaseResourceReturningMethodBinding {
 	protected OperationMethodBinding(Class<?> theReturnResourceType, Class<? extends IBaseResource> theReturnTypeFromRp, Method theMethod, FhirContext theContext, Object theProvider,
 												boolean theIdempotent, String theOperationName, Class<? extends IBaseResource> theOperationType, String theOperationTypeName,
 												OperationParam[] theReturnParams, BundleTypeEnum theBundleType, boolean theGlobal) {
+		this(theReturnResourceType, theReturnTypeFromRp, theMethod, theContext, theProvider, theIdempotent, theOperationName, theOperationType, theOperationTypeName,
+			theReturnParams, theBundleType, theGlobal, "");
+	}
+
+	protected OperationMethodBinding(Class<?> theReturnResourceType, Class<? extends IBaseResource> theReturnTypeFromRp, Method theMethod, FhirContext theContext, Object theProvider,
+												boolean theIdempotent, String theOperationName, Class<? extends IBaseResource> theOperationType, String theOperationTypeName,
+												OperationParam[] theReturnParams, BundleTypeEnum theBundleType, boolean theGlobal, String theTenantId) {
+
 		super(theReturnResourceType, theMethod, theContext, theProvider);
 
+		myTenantId = StringUtils.defaultIfBlank(theTenantId, null);
 		myBundleType = theBundleType;
 		myIdempotent = theIdempotent;
 		myDescription = ParametersUtil.extractDescription(theMethod);
@@ -182,7 +194,6 @@ public class OperationMethodBinding extends BaseResourceReturningMethodBinding {
 		if (myCanOperateAtInstanceLevel && !isGlobalMethod() && getResourceName() == null) {
 			throw new ConfigurationException(Msg.code(425) + "@" + Operation.class.getSimpleName() + " method is an instance level method (it has an @" + IdParam.class.getSimpleName() + " parameter) but is not marked as global() and is not declared in a resource provider: " + theMethod.getName());
 		}
-
 	}
 
 	public String getShortDescription() {
@@ -232,30 +243,40 @@ public class OperationMethodBinding extends BaseResourceReturningMethodBinding {
 	@Override
 	public MethodMatchEnum incomingServerRequestMatchesMethod(RequestDetails theRequest) {
 		if (isBlank(theRequest.getOperation())) {
+			ourLog.trace("Method {} does not match because the operation name is empty", getMethod());
 			return MethodMatchEnum.NONE;
 		}
 
 		if (!myName.equals(theRequest.getOperation())) {
 			if (!myName.equals(WILDCARD_NAME)) {
+				ourLog.trace("Method {} does not match because request is for method named {}", myName, theRequest.getOperation());
 				return MethodMatchEnum.NONE;
 			}
+		}
+
+		if (!StringUtils.equals(myTenantId, theRequest.getTenantId())) {
+			ourLog.trace("Method {} does not match because it is for tenant {} and request is for tenant {}", getMethod(), myTenantId, theRequest.getTenantId());
+			return MethodMatchEnum.NONE;
 		}
 
 		if (getResourceName() == null) {
 			if (isNotBlank(theRequest.getResourceName())) {
 				if (!isGlobalMethod()) {
+					ourLog.trace("Method {} does not match because it is not a global method and an empty resource type was provided: {}", getMethod(), theRequest.getResourceName());
 					return MethodMatchEnum.NONE;
 				}
 			}
 		}
 
 		if (getResourceName() != null && !getResourceName().equals(theRequest.getResourceName())) {
+			ourLog.trace("Method {} does not match because expected type {} does not match requested type {}", getMethod(), getResourceName(), theRequest.getResourceName());
 			return MethodMatchEnum.NONE;
 		}
 
 		RequestTypeEnum requestType = theRequest.getRequestType();
 		if (requestType != RequestTypeEnum.GET && requestType != RequestTypeEnum.POST) {
 			// Operations can only be invoked with GET and POST
+			ourLog.trace("Method {} does not match because it can only be request with GET or POST, instead {} was provided", getMethod(), theRequest.getRequestType());
 			return MethodMatchEnum.NONE;
 		}
 
@@ -266,6 +287,7 @@ public class OperationMethodBinding extends BaseResourceReturningMethodBinding {
 		if (isNotBlank(theRequest.getResourceName())) {
 			return myCanOperateAtTypeLevel ? MethodMatchEnum.EXACT : MethodMatchEnum.NONE;
 		}
+
 		return myCanOperateAtServerLevel ? MethodMatchEnum.EXACT : MethodMatchEnum.NONE;
 	}
 

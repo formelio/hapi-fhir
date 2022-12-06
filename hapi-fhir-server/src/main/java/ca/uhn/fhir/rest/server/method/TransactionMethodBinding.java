@@ -36,6 +36,7 @@ import ca.uhn.fhir.rest.server.exceptions.InternalErrorException;
 import ca.uhn.fhir.rest.server.exceptions.InvalidRequestException;
 import ca.uhn.fhir.rest.server.interceptor.IServerInterceptor.ActionRequestDetails;
 import ca.uhn.fhir.rest.server.method.TransactionParameter.ParamStyle;
+import org.apache.commons.lang3.StringUtils;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 
 import javax.annotation.Nonnull;
@@ -48,6 +49,7 @@ public class TransactionMethodBinding extends BaseResourceReturningMethodBinding
 
 	private int myTransactionParamIndex;
 	private ParamStyle myTransactionParamStyle;
+	private final String myTenantId;
 
 	public TransactionMethodBinding(Method theMethod, FhirContext theContext, Object theProvider) {
 		super(null, theMethod, theContext, theProvider);
@@ -71,6 +73,8 @@ public class TransactionMethodBinding extends BaseResourceReturningMethodBinding
 			throw new ConfigurationException(Msg.code(373) + "Method '" + theMethod.getName() + "' in type " + theMethod.getDeclaringClass().getCanonicalName() + " does not have a parameter annotated with the @"
 					+ TransactionParam.class + " annotation");
 		}
+		Transaction transaction = theMethod.getAnnotation(Transaction.class);
+		this.myTenantId = StringUtils.defaultIfBlank(transaction.tenantId(), null);
 	}
 
 	@Nonnull
@@ -98,6 +102,10 @@ public class TransactionMethodBinding extends BaseResourceReturningMethodBinding
 			return MethodMatchEnum.NONE;
 		}
 		if (isNotBlank(theRequest.getResourceName())) {
+			return MethodMatchEnum.NONE;
+		}
+		if (!StringUtils.equals(myTenantId, theRequest.getTenantId())) {
+			ourLog.trace("Method {} doesn't match because it is for tenant {} but request is for tenant {}", getMethod(), myTenantId, theRequest.getTenantId());
 			return MethodMatchEnum.NONE;
 		}
 		return MethodMatchEnum.EXACT;
