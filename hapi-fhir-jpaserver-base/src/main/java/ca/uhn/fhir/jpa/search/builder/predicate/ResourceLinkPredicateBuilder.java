@@ -78,6 +78,7 @@ import com.healthmarketscience.sqlbuilder.NotCondition;
 import com.healthmarketscience.sqlbuilder.SelectQuery;
 import com.healthmarketscience.sqlbuilder.UnaryCondition;
 import com.healthmarketscience.sqlbuilder.dbspec.basic.DbColumn;
+import org.apache.commons.lang3.StringUtils;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.instance.model.api.IIdType;
 import org.slf4j.Logger;
@@ -445,16 +446,28 @@ public class ResourceLinkPredicateBuilder
 		} else {
 			multiTypePredicate = QueryParameterUtils.toOrPredicate(orPredicates);
 		}
-		
+
 		List<String> pathsToMatch = createResourceLinkPaths(theResourceName, theParamName, theQualifiers);
 		Condition pathPredicate = createPredicateSourcePaths(pathsToMatch);
 		return QueryParameterUtils.toAndPredicate(pathPredicate, multiTypePredicate);
 	}
 
+	/**
+	 * Determines the resourceTypes a search parameter with a chain may refer to
+	 * @param theResourceName Resource that should have the search parameter
+	 * @param theParamName name of the search parameter (without the chain)
+	 * @param theReferenceParam the reference parameter, value may not be a reference if the parameter contains a chain
+	 * @return a list of possible resourceTypes that the parameter refers to
+	 */
 	@Nonnull
 	private List<String> determineCandidateResourceTypesForChain(String theResourceName, String theParamName, ReferenceParam theReferenceParam) {
 		final List<Class<? extends IBaseResource>> resourceTypes;
-		if (!theReferenceParam.hasResourceType()) {
+
+		// A token parameter with a system that has a URL would be interpreted as a reference with a resourceType instead.
+		boolean possiblyATokenParameter = StringUtils.isNotBlank(theReferenceParam.getChain())
+			&& StringUtils.isNotBlank(theReferenceParam.getValue()) && theReferenceParam.getValue().contains("|");
+
+		if (!theReferenceParam.hasResourceType() || possiblyATokenParameter) {
 
 			resourceTypes = determineResourceTypes(Collections.singleton(theResourceName), theParamName);
 
