@@ -1932,7 +1932,7 @@
 			<dependency>
 				<groupId>org.elasticsearch</groupId>
 				<artifactId>elasticsearch</artifactId>
-				<version>8.9.2</version>
+				<version>8.13.0</version>
 			</dependency>
 			<dependency>
 				<groupId>org.hibernate.search</groupId>
