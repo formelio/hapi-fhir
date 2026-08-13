@@ -1063,7 +1063,7 @@
 		<httpclient_version>4.5.14</httpclient_version>
 		<jackson_version>2.18.1</jackson_version>
 		<jackson_databind_version>2.18.1</jackson_databind_version>
-		<httpclient5_version>5.4.1</httpclient5_version>
+		<httpclient5_version>5.6.3</httpclient5_version>
 		<httpcore5_version>5.3.1</httpcore5_version>
 		<jackson_version>2.17.1</jackson_version>
 		<jackson_databind_version>2.17.1</jackson_databind_version>
